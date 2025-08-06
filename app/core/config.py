@@ -5,14 +5,21 @@ from functools import lru_cache
 
 
 class Settings(BaseSettings):
-    app_name: str = "MLX LLM Inference Server"
+    model_config = {
+        "protected_namespaces": (),
+        "env_file": ".env",
+        "env_file_encoding": "utf-8",
+        "case_sensitive": False
+    }
+    
+    app_name: str = "Activate LLM Inference Server"
     app_version: str = "1.0.0"
     debug: bool = False
     
     # Server Configuration
     host: str = "0.0.0.0"
     port: int = 8000
-    workers: int = 1  # MLX requires single worker for GPU access
+    workers: int = 1  # Activate requires single worker for GPU access
     
     # Model Configuration
     model_path: str = "mlx-community/Llama-3.2-1B-Instruct"
@@ -49,16 +56,12 @@ class Settings(BaseSettings):
     enable_metrics: bool = True
     metrics_port: int = 9090
     
-    class Config:
-        env_file = ".env"
-        env_file_encoding = "utf-8"
-        case_sensitive = False
         
     @property
     def is_production(self) -> bool:
         return not self.debug
         
-    def model_post_init(self, __context):
+    def model_post_init(self, __context=None):
         # Parse API keys from environment
         api_keys_env = os.getenv("API_KEYS", "")
         if api_keys_env:

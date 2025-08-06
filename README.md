@@ -1,6 +1,6 @@
-# MLX Inference Server
+# Activate LLM Inference Server
 
-Enterprise-grade LLM inference server built with MLX and FastAPI, providing an OpenAI-compatible API with production-ready features.
+Enterprise-grade LLM inference server built with Activate and FastAPI, providing an OpenAI-compatible API with production-ready features.
 
 ## Features
 
@@ -9,7 +9,7 @@ Enterprise-grade LLM inference server built with MLX and FastAPI, providing an O
 - **Enterprise Security**: API key authentication, CORS, rate limiting
 - **Observability**: Structured JSON logging, Prometheus metrics, health checks
 - **Production Ready**: Async processing, graceful shutdown, error handling
-- **MLX Optimized**: Native Metal GPU acceleration on Apple Silicon
+- **Activate Optimized**: Native Metal GPU acceleration on Apple Silicon
 
 ## Quick Start
 
@@ -28,7 +28,7 @@ cp config/.env.example .env
 
 3. **Access Services**
 ```bash
-# MLX API Server:     http://localhost:8000
+# Activate API Server:     http://localhost:8000
 # Prometheus:         http://localhost:9090
 # Grafana Dashboard:  http://localhost:3000 (admin/admin)  
 # API Documentation:  http://localhost:8000/docs
@@ -105,7 +105,7 @@ mlx-inference-server/
 ## Usage Options
 
 ```bash
-# Full stack (default) - MLX + Prometheus + Grafana
+# Full stack (default) - Activate + Prometheus + Grafana
 ./setup.sh
 
 # Production mode with full monitoring
@@ -129,7 +129,7 @@ PORT=8001 ./setup.sh
 - macOS with Apple Silicon (M1/M2/M3)
 - Python 3.8+
 - 8GB+ RAM recommended
-- MLX-compatible models
+- Activate-compatible models
 
 ## License
 

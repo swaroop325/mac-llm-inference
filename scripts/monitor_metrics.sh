@@ -1,10 +1,10 @@
 #!/bin/bash
-# Real-time metrics monitoring for MLX Inference Server
+# Real-time metrics monitoring for Activate LLM Inference Server
 
 PORT=${PORT:-8000}
 REFRESH_INTERVAL=${REFRESH_INTERVAL:-5}
 
-echo "MLX Inference Server Metrics Monitor"
+echo "Activate LLM Inference Server Metrics Monitor"
 echo "Server: http://localhost:$PORT"
 echo "Refresh: ${REFRESH_INTERVAL}s"
 echo "Press Ctrl+C to exit"
@@ -12,7 +12,7 @@ echo "======================================"
 
 while true; do
     clear
-    echo "🚀 MLX Inference Server Metrics - $(date)"
+    echo "🚀 Activate LLM Inference Server Metrics - $(date)"
     echo "======================================"
     
     # Check if server is running

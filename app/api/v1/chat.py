@@ -47,14 +47,31 @@ def count_tokens(text: str) -> int:
     return len(text) // 4
 
 
-@router.post("/chat/completions", response_model=ChatCompletionResponse)
+@router.post(
+    "/chat/completions", 
+    response_model=ChatCompletionResponse,
+    summary="Create chat completion",
+    description="Create chat completion using OpenAI-compatible API with Activate models.",
+    responses={
+        200: {"description": "Chat completion generated successfully"},
+        400: {"description": "Invalid request parameters"},
+        401: {"description": "Authentication required"},
+        429: {"description": "Rate limit exceeded"},
+        500: {"description": "Internal server error"},
+    },
+    tags=["Chat Completions"]
+)
 async def chat_completion(
     request: ChatCompletionRequest,
     background_tasks: BackgroundTasks,
     api_key: str = Depends(verify_api_key),
     req: Request = None
 ):
-    """OpenAI-compatible chat completion endpoint"""
+    """
+    Generate a chat completion response using Activate models.
+    
+    Compatible with OpenAI's chat completion API format.
+    """
     request_id = req.state.request_id if req else str(uuid.uuid4())
     
     logger.info(
@@ -138,14 +155,19 @@ async def chat_completion(
         )
 
 
-@router.post("/chat/completions/stream")
+@router.post(
+    "/chat/completions/stream",
+    summary="Stream chat completion", 
+    description="Stream chat completion responses (placeholder implementation)",
+    tags=["Chat Completions"]
+)
 async def chat_completion_stream(
     request: ChatCompletionRequest,
     api_key: str = Depends(verify_api_key),
     req: Request = None
 ):
     """Streaming chat completion endpoint (placeholder)"""
-    # Note: MLX doesn't natively support streaming yet
+    # Note: Activate doesn't natively support streaming yet
     # This is a placeholder for future implementation
     
     if not request.stream:

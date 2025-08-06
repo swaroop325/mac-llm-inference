@@ -69,9 +69,9 @@ class MetricsCollector:
         memory_usage_bytes.labels(type='used').set(memory.used)
         memory_usage_bytes.labels(type='available').set(memory.available)
         
-        # MLX GPU memory if available
+        # Activate GPU memory if available
         try:
-            # This is a placeholder - MLX doesn't directly expose GPU memory
+            # This is a placeholder - Activate doesn't directly expose GPU memory
             # In production, you might use system-specific tools
             pass
         except Exception:

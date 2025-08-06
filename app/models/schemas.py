@@ -15,15 +15,57 @@ class Message(BaseModel):
 
 
 class ChatCompletionRequest(BaseModel):
-    model: str
-    messages: List[Message]
-    temperature: Optional[float] = Field(default=0.7, ge=0.0, le=2.0)
-    max_tokens: Optional[int] = Field(default=256, ge=1, le=4096)
-    top_p: Optional[float] = Field(default=1.0, ge=0.0, le=1.0)
-    frequency_penalty: Optional[float] = Field(default=0.0, ge=-2.0, le=2.0)
-    presence_penalty: Optional[float] = Field(default=0.0, ge=-2.0, le=2.0)
-    stop: Optional[List[str]] = None
-    stream: Optional[bool] = False
+    model: str = Field(
+        ...,
+        description="ID of the model to use",
+        example="mlx-community/Llama-3.2-1B-Instruct-bf16"
+    )
+    messages: List[Message] = Field(
+        ...,
+        description="List of messages comprising the conversation so far",
+        example=[
+            {"role": "system", "content": "You are a helpful assistant."},
+            {"role": "user", "content": "Hello! How are you?"}
+        ]
+    )
+    temperature: Optional[float] = Field(
+        default=0.7, 
+        ge=0.0, 
+        le=2.0,
+        description="Controls randomness: 0 is deterministic, 2 is very random"
+    )
+    max_tokens: Optional[int] = Field(
+        default=256, 
+        ge=1, 
+        le=4096,
+        description="Maximum number of tokens to generate"
+    )
+    top_p: Optional[float] = Field(
+        default=1.0, 
+        ge=0.0, 
+        le=1.0,
+        description="Nucleus sampling parameter"
+    )
+    frequency_penalty: Optional[float] = Field(
+        default=0.0, 
+        ge=-2.0, 
+        le=2.0,
+        description="Penalty for frequent tokens"
+    )
+    presence_penalty: Optional[float] = Field(
+        default=0.0, 
+        ge=-2.0, 
+        le=2.0,
+        description="Penalty for tokens that have appeared"
+    )
+    stop: Optional[List[str]] = Field(
+        None,
+        description="Up to 4 sequences where the API will stop generating tokens"
+    )
+    stream: Optional[bool] = Field(
+        False,
+        description="Whether to stream back partial progress"
+    )
     
     @validator("messages")
     def messages_not_empty(cls, v):
@@ -67,6 +109,8 @@ class ErrorResponse(BaseModel):
     
     
 class HealthResponse(BaseModel):
+    model_config = {"protected_namespaces": ()}
+    
     status: Literal["healthy", "unhealthy"]
     version: str
     model_loaded: bool
@@ -76,6 +120,8 @@ class HealthResponse(BaseModel):
 
 
 class MetricsResponse(BaseModel):
+    model_config = {"protected_namespaces": ()}
+    
     requests_total: int
     requests_failed: int
     average_latency_ms: float

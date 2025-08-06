@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Example script to test the MLX Inference Server API
+Example script to test the Activate LLM Inference Server API
 """
 
 import requests

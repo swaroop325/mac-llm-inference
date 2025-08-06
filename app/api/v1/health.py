@@ -14,11 +14,31 @@ router = APIRouter()
 settings = get_settings()
 
 
-@router.get("/health", response_model=HealthResponse)
+@router.get(
+    "/health", 
+    response_model=HealthResponse,
+    summary="Health check",
+    description="""
+    Check the health status of the Activate inference server.
+    
+    Returns information about:
+    - Server status (healthy/unhealthy)
+    - GPU availability and type
+    - Model cache status
+    - System resources
+    - Service version
+    """,
+    tags=["Health"]
+)
 async def health_check():
-    """Health check endpoint"""
+    """
+    Perform a comprehensive health check of the server.
+    
+    This endpoint checks GPU access, model loading capability,
+    and system resources to determine overall server health.
+    """
     try:
-        # Check if MLX is available and GPU is accessible
+        # Check if Activate is available and GPU is accessible
         gpu_available = mx.default_device().type.name == "gpu"
         
         # Get model cache info
@@ -69,9 +89,20 @@ async def readiness_check():
     return {"status": "ready", "models": [], "note": "No models loaded, first request will be slower"}
 
 
-@router.get("/metrics", response_model=MetricsResponse)
+@router.get(
+    "/metrics", 
+    response_model=MetricsResponse,
+    summary="Get metrics (JSON)",
+    description="Get application metrics in JSON format for monitoring dashboards",
+    tags=["Monitoring"]
+)
 async def get_metrics():
-    """Get application metrics in JSON format"""
+    """
+    Retrieve application metrics in JSON format.
+    
+    Returns performance metrics, request statistics,
+    and system resource usage information.
+    """
     metrics_summary = metrics_collector.get_metrics_summary()
     cache_info = model_manager.get_cache_info()
     
@@ -81,13 +112,29 @@ async def get_metrics():
         average_latency_ms=metrics_summary["average_latency_ms"],
         model_cache_size=len(cache_info["cached_models"]),
         memory_usage_mb=metrics_summary["memory_usage_mb"],
-        gpu_memory_usage_mb=None  # MLX doesn't expose this directly
+        gpu_memory_usage_mb=None  # Activate doesn't expose this directly
     )
 
 
-@router.get("/metrics/prometheus", response_class=Response)
+@router.get(
+    "/metrics/prometheus", 
+    response_class=Response,
+    summary="Get metrics (Prometheus)",
+    description="""
+    Get metrics in Prometheus exposition format.
+    
+    This endpoint returns metrics in the standard Prometheus format
+    that can be scraped by Prometheus servers for monitoring and alerting.
+    """,
+    tags=["Monitoring"]
+)
 async def get_prometheus_metrics():
-    """Get metrics in Prometheus format"""
+    """
+    Retrieve metrics in Prometheus exposition format.
+    
+    Returns all application metrics in a format suitable
+    for Prometheus scraping and monitoring.
+    """
     if not settings.enable_metrics:
         return Response(
             content="Metrics disabled",

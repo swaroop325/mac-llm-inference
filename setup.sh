@@ -1,5 +1,5 @@
 #!/bin/bash
-# Unified setup and run script for MLX Inference Server
+# Unified setup and run script for Activate LLM Inference Server
 
 set -e  # Exit on error
 
@@ -54,17 +54,17 @@ for arg in "$@"; do
             echo "  LOG_LEVEL             Log level (default: INFO)"
             echo ""
             echo "Examples:"
-            echo "  $0                     Run with MLX + Prometheus + Grafana"
+            echo "  $0                     Run with Activate + Prometheus + Grafana"
             echo "  $0 --production        Production mode with full monitoring"
-            echo "  $0 --no-grafana        Run with MLX + Prometheus only"
-            echo "  $0 --no-prometheus     Run MLX server only (no monitoring)"
+            echo "  $0 --no-grafana        Run with Activate + Prometheus only"
+            echo "  $0 --no-prometheus     Run Activate server only (no monitoring)"
             echo "  PORT=8001 $0          Run on custom port 8001"
             exit 0
             ;;
     esac
 done
 
-print_info "Starting MLX Inference Server setup (Mode: $MODE)"
+print_info "Starting Activate LLM Inference Server setup (Mode: $MODE)"
 
 # Step 1: Check Python version
 PYTHON_VERSION=$(python3 --version 2>&1 | awk '{print $2}')
@@ -111,16 +111,16 @@ else
     print_warn "Copy config/.env.example to .env for custom configuration."
 fi
 
-# Step 7: Set MLX environment
+# Step 7: Set Activate environment
 export MLX_FORCE_METAL=1
 export PYTHONUNBUFFERED=1
 
-# Step 8: Verify MLX installation
-print_info "Verifying MLX installation..."
-if python -c "import mlx.core as mx; print(f'MLX Device: {mx.default_device().type.name}')" 2>/dev/null; then
-    print_info "MLX verified and GPU accessible ✓"
+# Step 8: Verify Activate installation
+print_info "Verifying Activate installation..."
+if python -c "import mlx.core as mx; print(f'Activate Device: {mx.default_device().type.name}')" 2>/dev/null; then
+    print_info "Activate verified and GPU accessible ✓"
 else
-    print_error "MLX verification failed!"
+    print_error "Activate verification failed!"
     exit 1
 fi
 
@@ -208,6 +208,9 @@ if [ "$ENABLE_GRAFANA" = "yes" ]; then
     brew services stop grafana 2>/dev/null || true
     sleep 1
     
+    # Get current directory for absolute paths
+    CURRENT_DIR=$(pwd)
+    
     # Create Grafana directories
     mkdir -p data/grafana/{data,logs,plugins,provisioning/datasources,provisioning/dashboards}
     
@@ -215,16 +218,19 @@ if [ "$ENABLE_GRAFANA" = "yes" ]; then
     cp -r config/grafana-provisioning/* data/grafana/provisioning/ 2>/dev/null || true
     
     # Copy dashboard to provisioning directory
-    mkdir -p /tmp/grafana-dashboards
-    cp config/grafana-dashboard.json /tmp/grafana-dashboards/mlx-dashboard.json
+    mkdir -p data/grafana-dashboards
+    cp config/grafana-dashboard.json data/grafana-dashboards/mlx-dashboard.json
     
-    # Create custom Grafana configuration
-    cat > data/grafana/grafana.ini << 'EOF'
+    # Update dashboard provisioning config with absolute path
+    sed -i '' "s|path: data/grafana-dashboards|path: ${CURRENT_DIR}/data/grafana-dashboards|g" data/grafana/provisioning/dashboards/dashboards.yml
+    
+    # Create custom Grafana configuration with absolute paths
+    cat > data/grafana/grafana.ini << EOF
 [paths]
-data = ./data/grafana/data
-logs = ./data/grafana/logs
-plugins = ./data/grafana/plugins
-provisioning = ./data/grafana/provisioning
+data = ${CURRENT_DIR}/data/grafana/data
+logs = ${CURRENT_DIR}/data/grafana/logs
+plugins = ${CURRENT_DIR}/data/grafana/plugins
+provisioning = ${CURRENT_DIR}/data/grafana/provisioning
 
 [server]
 http_port = 3000
@@ -252,12 +258,12 @@ EOF
 fi
 
 # Step 12: Start main server
-print_info "Starting MLX Inference Server on port $PORT..."
+print_info "Starting Activate LLM Inference Server on port $PORT..."
 echo ""
 
 if [ "$ENABLE_PROMETHEUS" = "yes" ] || [ "$ENABLE_GRAFANA" = "yes" ]; then
     print_info "🚀 Services will be available at:"
-    print_info "  📡 MLX API Server:  http://localhost:$PORT"
+    print_info "  📡 Activate API Server:  http://localhost:$PORT"
     
     if [ "$ENABLE_PROMETHEUS" = "yes" ]; then
         print_info "  📊 Prometheus:      http://localhost:9090"
@@ -269,14 +275,22 @@ if [ "$ENABLE_PROMETHEUS" = "yes" ] || [ "$ENABLE_GRAFANA" = "yes" ]; then
     fi
     
     print_info "  ❤️  Health Check:    http://localhost:$PORT/health"
+    print_info "  🔑 API Docs:        http://localhost:$PORT/docs"
+    echo ""
+    
+    print_info "🔐 API Key Management:"
+    print_info "  🌐 Web Interface:      http://localhost:$PORT/docs (Swagger UI)"
+    print_info "  ➕ Create key:         POST http://localhost:$PORT/auth/keys"
+    print_info "  📋 List keys:          GET  http://localhost:$PORT/auth/keys"
+    print_info "  📊 Usage stats:        GET  http://localhost:$PORT/auth/keys/usage/stats"
     echo ""
     
     if [ "$ENABLE_GRAFANA" = "yes" ]; then
         print_info "💡 Grafana Setup:"
         print_info "  ✅ Prometheus data source automatically configured"
-        print_info "  ✅ MLX Dashboard automatically imported and ready"
+        print_info "  ✅ Activate Dashboard automatically imported and ready"
         print_info "  🔑 Login: admin/admin (change password when prompted)"
-        print_info "  📊 Dashboard: MLX Inference Server Dashboard"
+        print_info "  📊 Dashboard: Activate LLM Inference Server Dashboard"
         echo ""
     fi
 fi

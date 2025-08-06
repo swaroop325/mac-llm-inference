@@ -5,7 +5,7 @@ print_info() { echo -e "\033[0;32m[INFO]\033[0m $1"; }
 print_warn() { echo -e "\033[1;33m[WARN]\033[0m $1"; }
 print_error() { echo -e "\033[0;31m[ERROR]\033[0m $1"; }
 
-print_info "Setting up Grafana for MLX Inference Server..."
+print_info "Setting up Grafana for Activate LLM Inference Server..."
 
 # Check if Grafana is installed
 if ! command -v grafana-server &> /dev/null; then

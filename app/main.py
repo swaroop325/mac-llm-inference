@@ -5,10 +5,11 @@ import mlx.core as mx
 
 from app.core.config import get_settings
 from app.core.logging import logger
-from app.api.v1 import chat, health
+from app.api.v1 import chat, health, auth
 from app.utils.middleware import (
     RequestIdMiddleware, 
-    ErrorHandlingMiddleware, 
+    ErrorHandlingMiddleware,
+    AuthenticationMiddleware,
     setup_cors
 )
 from app.utils.metrics import metrics_collector, active_requests
@@ -23,7 +24,7 @@ async def lifespan(app: FastAPI):
     """Manage application lifecycle"""
     # Startup
     logger.info(f"Starting {settings.app_name} v{settings.app_version}")
-    logger.info(f"MLX device: {mx.default_device().type.name}")
+    logger.info(f"Activate device: {mx.default_device().type.name}")
     logger.info(f"Debug mode: {settings.debug}")
     logger.info(f"API authentication: {'enabled' if settings.api_keys else 'disabled'}")
     
@@ -48,29 +49,59 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title=settings.app_name,
     version=settings.app_version,
-    description="Enterprise-grade MLX inference server with OpenAI-compatible API",
-    docs_url="/docs" if settings.debug else None,
-    redoc_url="/redoc" if settings.debug else None,
-    openapi_url="/openapi.json" if settings.debug else None,
+    description="""
+    # Activate LLM Inference Server
+    
+    Enterprise-grade LLM inference server with OpenAI-compatible API endpoints.
+    
+    ## Quick Start
+    1. Create an API key using `POST /auth/keys`
+    2. Use the key in `Authorization: Bearer your-key` for chat endpoints
+    
+    ## Available Models
+    - `mlx-community/Llama-3.2-1B-Instruct-bf16`
+    
+    ## Monitoring
+    - Grafana: http://localhost:3000 (admin/admin)
+    - Prometheus: http://localhost:9090
+    """,
+    contact={
+        "name": "Activate LLM Inference Server",
+        "url": "https://github.com/ml-explore/mlx",
+    },
+    license_info={
+        "name": "MIT License",
+        "url": "https://opensource.org/licenses/MIT",
+    },
+    docs_url="/docs",
+    redoc_url="/redoc", 
+    openapi_url="/openapi.json",
     lifespan=lifespan
 )
 
 # Setup middleware
 app.add_middleware(RequestIdMiddleware)
 app.add_middleware(ErrorHandlingMiddleware)
+app.add_middleware(AuthenticationMiddleware)
 setup_cors(app)
 
 # Include routers
 app.include_router(
     chat.router,
     prefix="/v1",
-    tags=["chat"]
+    tags=["Chat Completions"]
 )
 
 app.include_router(
     health.router,
     prefix="",
-    tags=["health"]
+    tags=["Health & Monitoring"]
+)
+
+app.include_router(
+    auth.router,
+    prefix="/auth",
+    tags=["API Key Management"]
 )
 
 
