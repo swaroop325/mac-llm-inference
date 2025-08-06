@@ -26,16 +26,30 @@ settings = get_settings()
 def extract_prompt(messages: list[Message]) -> str:
     """Extract prompt from messages list"""
     prompt_parts = []
+    
+    # Handle system message if present
+    system_msg = None
+    conversation = []
+    
     for msg in messages:
         if msg.role == "system":
-            prompt_parts.append(f"System: {msg.content}")
-        elif msg.role == "user":
-            prompt_parts.append(f"User: {msg.content}")
-        elif msg.role == "assistant":
-            prompt_parts.append(f"Assistant: {msg.content}")
+            system_msg = msg.content
+        else:
+            conversation.append(msg)
     
-    # Add final assistant prompt
-    prompt_parts.append("Assistant:")
+    # Build prompt based on model format
+    if system_msg:
+        prompt_parts.append(f"<|system|>\n{system_msg}")
+    
+    # Add conversation history
+    for msg in conversation:
+        if msg.role == "user":
+            prompt_parts.append(f"<|user|>\n{msg.content}")
+        elif msg.role == "assistant":
+            prompt_parts.append(f"<|assistant|>\n{msg.content}")
+    
+    # Add assistant prompt for completion
+    prompt_parts.append("<|assistant|>")
     
     return "\n".join(prompt_parts)
 

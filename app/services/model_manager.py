@@ -108,6 +108,42 @@ class ModelManager:
                 logger.error(f"Failed to load model {model_name}: {str(e)}")
                 raise
     
+    def _clean_response(self, response: str) -> str:
+        """Clean and post-process the generated response"""
+        # Stop at common conversation boundaries
+        stop_sequences = [
+            "<|user|>", "<|system|>", "<|assistant|>",
+            "\nUser:", "\nAssistant:", "\nSystem:",
+            "User:", "Assistant:", "System:"
+        ]
+        
+        # Find the earliest stop sequence
+        min_pos = len(response)
+        for stop_seq in stop_sequences:
+            pos = response.find(stop_seq)
+            if pos != -1 and pos < min_pos:
+                min_pos = pos
+        
+        # Truncate at stop sequence
+        if min_pos < len(response):
+            response = response[:min_pos]
+        
+        # Clean up trailing whitespace and incomplete sentences
+        response = response.strip()
+        
+        # Remove incomplete trailing sentences if they end abruptly
+        if response and not response[-1] in '.!?':
+            # Find last complete sentence
+            last_complete = max(
+                response.rfind('.'),
+                response.rfind('!'),
+                response.rfind('?')
+            )
+            if last_complete > len(response) * 0.5:  # Only if we have substantial content
+                response = response[:last_complete + 1]
+        
+        return response
+
     async def generate_response(
         self, 
         model_name: str, 
@@ -131,7 +167,9 @@ class ModelManager:
             {"temp": temperature, "max_tokens": max_tokens, "top_p": top_p}
         )
         
-        return response
+        # Clean and post-process the response
+        cleaned_response = self._clean_response(response)
+        return cleaned_response
     
     def get_cache_info(self) -> Dict[str, Any]:
         """Get information about the model cache"""
