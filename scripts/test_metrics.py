@@ -58,7 +58,7 @@ def test_endpoints():
             # Test 4: Make authenticated requests
             print("\n4️⃣  Testing chat completion with API key...")
             chat_payload = {
-                "model": "mlx-community/Llama-3.2-1B-Instruct-bf16",
+                "model": "mlx-community/Mistral-7B-Instruct-v0.3-4bit",
                 "messages": [
                     {"role": "user", "content": "Hello! This is a test message for metrics collection."}
                 ],

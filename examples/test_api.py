@@ -19,7 +19,7 @@ def test_mlx_api():
     # Test chat completion
     print("💬 Testing chat completion...")
     payload = {
-        "model": "mlx-community/Llama-3.2-1B-Instruct-bf16",
+        "model": "mlx-community/Mistral-7B-Instruct-v0.3-4bit",
         "messages": [
             {"role": "system", "content": "You are a helpful assistant."},
             {"role": "user", "content": "Say hello in one sentence."}

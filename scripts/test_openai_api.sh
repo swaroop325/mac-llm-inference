@@ -13,7 +13,7 @@ curl -s -X POST http://localhost:$PORT/v1/chat/completions \
   -H "Content-Type: application/json" \
   -H "X-API-Key: $API_KEY" \
   -d '{
-    "model": "mlx-community/Llama-3.2-1B-Instruct-bf16",
+    "model": "mlx-community/Mistral-7B-Instruct-v0.3-4bit",
     "messages": [
       {"role": "system", "content": "You are a helpful assistant."},
       {"role": "user", "content": "Say hello in one sentence."}
@@ -27,7 +27,7 @@ echo "2. Testing with minimal parameters..."
 curl -s -X POST http://localhost:$PORT/v1/chat/completions \
   -H "Content-Type: application/json" \
   -d '{
-    "model": "mlx-community/Llama-3.2-1B-Instruct-bf16",
+    "model": "mlx-community/Mistral-7B-Instruct-v0.3-4bit",
     "messages": [
       {"role": "user", "content": "Hi"}
     ]

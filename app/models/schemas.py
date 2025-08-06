@@ -18,7 +18,7 @@ class ChatCompletionRequest(BaseModel):
     model: str = Field(
         ...,
         description="ID of the model to use",
-        example="mlx-community/Llama-3.2-1B-Instruct-bf16"
+        example="mlx-community/Mistral-7B-Instruct-v0.3-4bit"
     )
     messages: List[Message] = Field(
         ...,
