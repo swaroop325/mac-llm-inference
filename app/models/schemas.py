@@ -128,3 +128,27 @@ class MetricsResponse(BaseModel):
     model_cache_size: int
     memory_usage_mb: float
     gpu_memory_usage_mb: Optional[float] = None
+
+
+class ModelPreloadRequest(BaseModel):
+    model: str = Field(
+        ...,
+        description="Model identifier to preload into cache",
+        example="mlx-community/Mistral-7B-Instruct-v0.3-4bit"
+    )
+
+
+class ModelPreloadResponse(BaseModel):
+    model: str
+    status: Literal["success", "error", "already_cached"]
+    load_time_seconds: Optional[float] = None
+    message: str
+    cache_info: Optional[Dict[str, Any]] = None
+
+
+class ModelCacheResponse(BaseModel):
+    cached_models: List[str]
+    cache_size: int
+    max_cache_size: int
+    load_times: Dict[str, float]
+    memory_usage: Dict[str, float]

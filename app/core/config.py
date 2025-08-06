@@ -31,6 +31,7 @@ class Settings(BaseSettings):
     default_max_tokens: int = 256
     max_allowed_tokens: int = 4096
     timeout_seconds: int = 300
+    model_load_timeout_seconds: int = 600  # 10 minutes for model loading
     
     # Memory Management
     max_memory_gb: float = 8.0

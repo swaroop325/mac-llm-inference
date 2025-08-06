@@ -7,7 +7,7 @@ import time
 
 from app.core.config import get_settings
 from app.core.logging import logger
-from app.api.v1 import chat, health, auth
+from app.api.v1 import chat, health, auth, models
 from app.utils.middleware import (
     RequestIdMiddleware, 
     ErrorHandlingMiddleware,
@@ -105,7 +105,7 @@ def custom_openapi():
     }
     
     # Apply security to protected endpoints
-    protected_paths = ["/v1/chat/completions", "/auth/me"]
+    protected_paths = ["/v1/chat/completions", "/v1/models", "/auth/me"]
     for path, methods in openapi_schema["paths"].items():
         # Check if this path needs authentication
         needs_auth = any(path.startswith(protected) for protected in protected_paths)
@@ -144,6 +144,12 @@ app.include_router(
     tags=["API Key Management"]
 )
 
+app.include_router(
+    models.router,
+    prefix="/v1/models",
+    tags=["Model Management"]
+)
+
 
 @app.get("/")
 async def root():
@@ -154,7 +160,8 @@ async def root():
         "status": "running",
         "endpoints": {
             "chat": "/v1/chat/completions",
-            "health": "/health",
+            "models": "/v1/models",
+            "health": "/health", 
             "metrics": "/metrics",
             "docs": "/docs" if settings.debug else None
         }

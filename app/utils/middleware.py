@@ -84,7 +84,7 @@ class AuthenticationMiddleware(BaseHTTPMiddleware):
     
     def __init__(self, app, protected_paths: list = None):
         super().__init__(app)
-        self.protected_paths = protected_paths or ["/v1/chat/completions", "/auth/me"]
+        self.protected_paths = protected_paths or ["/v1/chat/completions", "/v1/models", "/auth/me"]
         
     async def dispatch(self, request: Request, call_next: Callable) -> Response:
         # Skip auth for health/monitoring endpoints and docs  
