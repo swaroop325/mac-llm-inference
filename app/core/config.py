@@ -50,7 +50,7 @@ class Settings(BaseSettings):
     # Logging
     log_level: str = "INFO"
     log_format: str = "json"
-    log_file: Optional[str] = None
+    log_file: Optional[str] = "logs/mlx_server.log"
     
     # Monitoring
     enable_metrics: bool = True

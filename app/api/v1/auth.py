@@ -1,6 +1,6 @@
 """Authentication and API key management endpoints."""
 
-from fastapi import APIRouter, HTTPException, Depends, status, Security, Query
+from fastapi import APIRouter, HTTPException, Depends, status, Security, Query, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel, Field
 from typing import Optional, List, Dict, Any
@@ -116,7 +116,14 @@ async def create_api_key(request: CreateAPIKeyRequest):
 async def list_api_keys(include_inactive: bool = False):
     """List all API keys."""
     keys = db_manager.list_api_keys(include_inactive=include_inactive)
-    return [APIKeyResponse(**key) for key in keys]
+    # Map database field names to response field names
+    mapped_keys = []
+    for key in keys:
+        mapped_key = dict(key)
+        mapped_key['name'] = mapped_key.pop('key_name')
+        mapped_key['prefix'] = mapped_key.pop('key_prefix')
+        mapped_keys.append(mapped_key)
+    return [APIKeyResponse(**key) for key in mapped_keys]
 
 @router.get(
     "/keys/{key_id}",
@@ -135,7 +142,12 @@ async def get_api_key(key_id: int):
             detail=f"API key with ID {key_id} not found"
         )
     
-    return APIKeyResponse(**key_data)
+    # Map database field names to response field names
+    mapped_key = dict(key_data)
+    mapped_key['name'] = mapped_key.pop('key_name')
+    mapped_key['prefix'] = mapped_key.pop('key_prefix')
+    
+    return APIKeyResponse(**mapped_key)
 
 @router.patch(
     "/keys/{key_id}/deactivate",
@@ -216,10 +228,16 @@ async def get_key_usage_stats(
     description="Get information about the currently authenticated API key",
     tags=["Authentication"]
 )
-async def get_current_key_info(
-    current_key: Dict[str, Any] = Depends(get_current_api_key)
-):
+async def get_current_key_info(req: Request = None):
     """Get information about the current API key."""
+    # Get key info from middleware (stored in request state)
+    if not hasattr(req.state, 'api_key_info'):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="API key information not available"
+        )
+    
+    current_key = req.state.api_key_info
     return APIKeyInfo(
         id=current_key['id'],
         name=current_key['key_name'],

@@ -27,8 +27,7 @@ settings = get_settings()
     - Model cache status
     - System resources
     - Service version
-    """,
-    tags=["Health"]
+    """
 )
 async def health_check():
     """
@@ -93,8 +92,7 @@ async def readiness_check():
     "/metrics", 
     response_model=MetricsResponse,
     summary="Get metrics (JSON)",
-    description="Get application metrics in JSON format for monitoring dashboards",
-    tags=["Monitoring"]
+    description="Get application metrics in JSON format for monitoring dashboards"
 )
 async def get_metrics():
     """
@@ -125,8 +123,7 @@ async def get_metrics():
     
     This endpoint returns metrics in the standard Prometheus format
     that can be scraped by Prometheus servers for monitoring and alerting.
-    """,
-    tags=["Monitoring"]
+    """
 )
 async def get_prometheus_metrics():
     """

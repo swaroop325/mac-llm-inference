@@ -1,5 +1,6 @@
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
+from fastapi.openapi.utils import get_openapi
 from contextlib import asynccontextmanager
 import mlx.core as mx
 
@@ -56,7 +57,8 @@ app = FastAPI(
     
     ## Quick Start
     1. Create an API key using `POST /auth/keys`
-    2. Use the key in `Authorization: Bearer your-key` for chat endpoints
+    2. Click the **🔒 Authorize** button above to enter your API key
+    3. Use the chat completion endpoints
     
     ## Available Models
     - `mlx-community/Llama-3.2-1B-Instruct-bf16`
@@ -78,6 +80,43 @@ app = FastAPI(
     openapi_url="/openapi.json",
     lifespan=lifespan
 )
+
+# Configure security for Swagger UI
+def custom_openapi():
+    if app.openapi_schema:
+        return app.openapi_schema
+    
+    openapi_schema = get_openapi(
+        title=app.title,
+        version=app.version,
+        description=app.description,
+        routes=app.routes,
+    )
+    
+    # Add security scheme for Bearer token
+    openapi_schema["components"]["securitySchemes"] = {
+        "BearerAuth": {
+            "type": "http",
+            "scheme": "bearer",
+            "bearerFormat": "API Key",
+            "description": "Enter your API key (starts with mlx_)"
+        }
+    }
+    
+    # Apply security to protected endpoints
+    protected_paths = ["/v1/chat/completions", "/auth/me"]
+    for path, methods in openapi_schema["paths"].items():
+        # Check if this path needs authentication
+        needs_auth = any(path.startswith(protected) for protected in protected_paths)
+        if needs_auth:
+            for method, operation in methods.items():
+                if method in ["get", "post", "put", "patch", "delete"]:
+                    operation["security"] = [{"BearerAuth": []}]
+    
+    app.openapi_schema = openapi_schema
+    return app.openapi_schema
+
+app.openapi = custom_openapi
 
 # Setup middleware
 app.add_middleware(RequestIdMiddleware)

@@ -14,7 +14,6 @@ from app.models.schemas import (
     ErrorResponse
 )
 from app.services.model_manager import model_manager
-from app.utils.security import verify_api_key
 from app.utils.metrics import metrics_collector, inference_duration
 from app.core.logging import logger
 from app.core.config import get_settings
@@ -64,7 +63,6 @@ def count_tokens(text: str) -> int:
 async def chat_completion(
     request: ChatCompletionRequest,
     background_tasks: BackgroundTasks,
-    api_key: str = Depends(verify_api_key),
     req: Request = None
 ):
     """
@@ -163,7 +161,6 @@ async def chat_completion(
 )
 async def chat_completion_stream(
     request: ChatCompletionRequest,
-    api_key: str = Depends(verify_api_key),
     req: Request = None
 ):
     """Streaming chat completion endpoint (placeholder)"""
@@ -172,11 +169,11 @@ async def chat_completion_stream(
     
     if not request.stream:
         # If not streaming, redirect to regular endpoint
-        return await chat_completion(request, BackgroundTasks(), api_key, req)
+        return await chat_completion(request, BackgroundTasks(), req)
     
     async def generate_stream() -> AsyncGenerator[str, None]:
         # Placeholder streaming implementation
-        response = await chat_completion(request, BackgroundTasks(), api_key, req)
+        response = await chat_completion(request, BackgroundTasks(), req)
         
         # Convert to SSE format
         import json

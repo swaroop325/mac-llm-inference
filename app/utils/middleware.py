@@ -84,7 +84,7 @@ class AuthenticationMiddleware(BaseHTTPMiddleware):
     
     def __init__(self, app, protected_paths: list = None):
         super().__init__(app)
-        self.protected_paths = protected_paths or ["/v1/chat/completions"]
+        self.protected_paths = protected_paths or ["/v1/chat/completions", "/auth/me"]
         
     async def dispatch(self, request: Request, call_next: Callable) -> Response:
         # Skip auth for health/monitoring endpoints and docs  
@@ -98,7 +98,8 @@ class AuthenticationMiddleware(BaseHTTPMiddleware):
         
         # Skip auth for key management endpoints (as per your requirement)
         # Note: This means anyone can manage API keys - consider security implications
-        if request.url.path.startswith("/auth"):
+        # But /auth/me requires authentication to get current key info
+        if request.url.path.startswith("/auth") and request.url.path != "/auth/me":
             return await call_next(request)
         
         # Check if this is a protected endpoint (chat completions and other API endpoints)

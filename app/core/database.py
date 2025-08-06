@@ -136,7 +136,11 @@ class DatabaseManager:
                     "expires_at": expires_at.isoformat() if expires_at else None,
                     "rate_limit": rate_limit,
                     "created_at": datetime.utcnow().isoformat(),
-                    "is_active": True
+                    "is_active": True,
+                    "usage_count": 0,  # New key starts with 0 usage
+                    "created_by": created_by,  # Include the created_by parameter
+                    "last_used_at": None,  # New key hasn't been used yet
+                    "metadata": metadata  # Include metadata
                 }
                 
             except sqlite3.IntegrityError as e:
