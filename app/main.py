@@ -3,6 +3,7 @@ from fastapi.responses import JSONResponse
 from fastapi.openapi.utils import get_openapi
 from contextlib import asynccontextmanager
 import mlx.core as mx
+import time
 
 from app.core.config import get_settings
 from app.core.logging import logger
@@ -190,12 +191,28 @@ async def method_not_allowed_handler(request: Request, exc):
     )
 
 
-# Middleware for tracking active requests
+# Middleware for tracking active requests and HTTP metrics
 @app.middleware("http")
 async def track_requests(request: Request, call_next):
+    from app.utils.metrics import request_count, request_duration
+    
     active_requests.inc()
+    start_time = time.time()
     try:
         response = await call_next(request)
+        
+        # Record HTTP metrics
+        request_count.labels(
+            method=request.method,
+            endpoint=request.url.path,
+            status=str(response.status_code)
+        ).inc()
+        
+        request_duration.labels(
+            method=request.method,
+            endpoint=request.url.path
+        ).observe(time.time() - start_time)
+        
         return response
     finally:
         active_requests.dec()
