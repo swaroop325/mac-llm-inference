@@ -217,9 +217,41 @@ if [ "$ENABLE_GRAFANA" = "yes" ]; then
     # Copy provisioning files
     cp -r config/grafana-provisioning/* data/grafana/provisioning/ 2>/dev/null || true
     
-    # Copy dashboard to provisioning directory
+    # Ensure dashboard directory exists (dashboard should already be there from git)
     mkdir -p data/grafana-dashboards
-    cp config/grafana-dashboard.json data/grafana-dashboards/mlx-dashboard.json
+    
+    # Check if dashboard exists, if not create a basic one
+    if [ ! -f "data/grafana-dashboards/mlx-dashboard.json" ]; then
+        print_warn "Dashboard file not found, creating basic dashboard..."
+        cat > data/grafana-dashboards/mlx-dashboard.json << 'EOF'
+{
+  "id": null,
+  "title": "MLX Inference Server - Basic",
+  "tags": ["mlx", "inference", "metrics"],
+  "timezone": "browser",
+  "refresh": "10s",
+  "time": {"from": "now-1h", "to": "now"},
+  "panels": [
+    {
+      "id": 1,
+      "title": "Total Requests",
+      "type": "stat",
+      "targets": [{"expr": "sum(http_requests_total)", "legendFormat": "Requests"}],
+      "gridPos": {"h": 4, "w": 6, "x": 0, "y": 0}
+    },
+    {
+      "id": 2,
+      "title": "Memory Usage",
+      "type": "stat",
+      "targets": [{"expr": "memory_usage_bytes{type='used'} / 1024^3", "legendFormat": "Used GB"}],
+      "gridPos": {"h": 4, "w": 6, "x": 6, "y": 0}
+    }
+  ],
+  "schemaVersion": 30,
+  "version": 1
+}
+EOF
+    fi
     
     # Update dashboard provisioning config with absolute path
     sed -i '' "s|path: data/grafana-dashboards|path: ${CURRENT_DIR}/data/grafana-dashboards|g" data/grafana/provisioning/dashboards/dashboards.yml

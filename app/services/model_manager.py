@@ -52,6 +52,10 @@ class ModelManager:
                 del self._last_access[lru_model]
                 del self._load_times[lru_model]
                 logger.info(f"Evicted model {lru_model} from cache")
+                
+                # Record cache eviction
+                from app.utils.metrics import metrics_collector
+                metrics_collector.record_cache_operation("eviction")
     
     async def get_model(self, model_name: str) -> Tuple[Any, Any]:
         """Get a model from cache or load it"""
@@ -62,6 +66,11 @@ class ModelManager:
                 # Move to end (most recently used)
                 self._models_cache.move_to_end(model_name)
                 logger.debug(f"Model {model_name} retrieved from cache")
+                
+                # Record cache hit
+                from app.utils.metrics import metrics_collector
+                metrics_collector.record_cache_operation("hit")
+                
                 return self._models_cache[model_name]
         
         # Get or create loading lock for this model
@@ -74,11 +83,19 @@ class ModelManager:
             with self._cache_lock:
                 if model_name in self._models_cache:
                     self._last_access[model_name] = time.time()
+                    from app.utils.metrics import metrics_collector
+                    metrics_collector.record_cache_operation("hit")
                     return self._models_cache[model_name]
+            
+            # Record cache miss and load
+            from app.utils.metrics import metrics_collector
+            metrics_collector.record_cache_operation("miss")
+            metrics_collector.record_cache_operation("load")
             
             # Load model
             logger.info(f"Loading model {model_name}")
             start_time = time.time()
+            start_memory = psutil.virtual_memory().used
             
             try:
                 # Run model loading in thread pool to avoid blocking
@@ -101,6 +118,14 @@ class ModelManager:
                 with self._cache_lock:
                     self._models_cache[model_name] = (model, tokenizer)
                     self._last_access[model_name] = time.time()
+                
+                # Estimate memory usage (rough calculation)
+                memory_after = psutil.virtual_memory().used
+                estimated_model_memory = max(0, memory_after - start_memory)
+                
+                # Record model memory footprint
+                from app.utils.metrics import model_memory_usage_bytes
+                model_memory_usage_bytes.labels(model_name=model_name).set(estimated_model_memory)
                 
                 return model, tokenizer
                 

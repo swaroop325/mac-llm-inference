@@ -4,6 +4,7 @@ from fastapi.openapi.utils import get_openapi
 from contextlib import asynccontextmanager
 import mlx.core as mx
 import time
+import asyncio
 
 from app.core.config import get_settings
 from app.core.logging import logger
@@ -30,6 +31,13 @@ async def lifespan(app: FastAPI):
     logger.info(f"Debug mode: {settings.debug}")
     logger.info(f"API authentication: {'enabled' if settings.api_keys else 'disabled'}")
     
+    # Start metrics collection task
+    metrics_task = None
+    if settings.enable_metrics:
+        from app.utils.metrics import metrics_collector
+        metrics_task = asyncio.create_task(start_metrics_collection())
+        logger.info("Started metrics collection background task")
+    
     # Preload default model if specified
     if settings.model_path and settings.debug:
         try:
@@ -43,8 +51,38 @@ async def lifespan(app: FastAPI):
     
     # Shutdown
     logger.info("Shutting down application")
+    if metrics_task:
+        metrics_task.cancel()
+        try:
+            await metrics_task
+        except asyncio.CancelledError:
+            pass
     from app.services.model_manager import model_manager
     model_manager.clear_cache()
+
+
+async def start_metrics_collection():
+    """Background task to continuously update metrics"""
+    from app.utils.metrics import metrics_collector
+    from app.services.model_manager import model_manager
+    
+    while True:
+        try:
+            # Update memory and system metrics
+            metrics_collector.update_memory_metrics()
+            
+            # Update model cache metrics
+            cache_info = model_manager.get_cache_info()
+            from app.utils.metrics import model_cache_size
+            model_cache_size.set(cache_info["cache_size"])
+            
+            # Wait 10 seconds before next update
+            await asyncio.sleep(10)
+        except asyncio.CancelledError:
+            break
+        except Exception as e:
+            logger.warning(f"Error updating metrics: {e}")
+            await asyncio.sleep(30)  # Wait longer on error
 
 
 # Create FastAPI app

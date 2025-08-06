@@ -86,6 +86,16 @@ async def chat_completion(
     """
     request_id = req.state.request_id if req else str(uuid.uuid4())
     
+    # Get API key prefix for metrics (first 8 characters for privacy)
+    api_key_prefix = "unknown"
+    if req and hasattr(req.state, 'api_key') and req.state.api_key:
+        api_key_prefix = req.state.api_key[:8] + "..."
+    elif req:
+        # Fallback: get from header
+        api_key = req.headers.get("X-API-Key") or req.headers.get("Authorization", "").replace("Bearer ", "")
+        if api_key and len(api_key) > 8:
+            api_key_prefix = api_key[:8] + "..."
+    
     logger.info(
         f"Chat completion request",
         extra={
@@ -102,8 +112,12 @@ async def chat_completion(
         prompt = extract_prompt(request.messages)
         prompt_tokens = count_tokens(prompt)
         
+        # Record inference start
+        metrics_collector.record_inference_start()
+        
         # Generate response with timeout
         start_time = time.time()
+        first_token_start = time.time()
         
         response_text = await asyncio.wait_for(
             model_manager.generate_response(
@@ -118,6 +132,25 @@ async def chat_completion(
         
         inference_time = time.time() - start_time
         completion_tokens = count_tokens(response_text)
+        
+        # Record inference end
+        metrics_collector.record_inference_end()
+        
+        # Record token metrics
+        # Note: For simplicity, we'll use inference_time as first_token_time
+        # In a streaming implementation, you'd track actual first token time
+        first_token_time = min(0.1, inference_time)  # Estimate first token time
+        metrics_collector.record_token_metrics(
+            model_name=request.model,
+            prompt_tokens=prompt_tokens,
+            completion_tokens=completion_tokens,
+            generation_time=inference_time,
+            first_token_time=first_token_time,
+            api_key_prefix=api_key_prefix
+        )
+        
+        # Record API key request success
+        metrics_collector.record_api_key_request(api_key_prefix, request.model, "success")
         
         # Record metrics
         with inference_duration.labels(model_name=request.model).time():
@@ -154,12 +187,29 @@ async def chat_completion(
         return response
         
     except asyncio.TimeoutError:
+        metrics_collector.record_inference_end()  # Ensure we clean up inference counter
+        metrics_collector.record_error("timeout", request.model, "chat_completion")
+        metrics_collector.record_api_key_request(api_key_prefix, request.model, "timeout")
         logger.error(f"Inference timeout for request {request_id}")
         raise HTTPException(
             status_code=504,
             detail="Inference timeout"
         )
     except Exception as e:
+        metrics_collector.record_inference_end()  # Ensure we clean up inference counter
+        
+        # Categorize error types
+        if "404" in str(e) or "Repository Not Found" in str(e):
+            error_type = "model_not_found"
+        elif "Memory" in str(e) or "OOM" in str(e):
+            error_type = "out_of_memory"
+        elif "CUDA" in str(e) or "GPU" in str(e):
+            error_type = "gpu_error"
+        else:
+            error_type = "internal_error"
+            
+        metrics_collector.record_error(error_type, request.model, "chat_completion")
+        metrics_collector.record_api_key_request(api_key_prefix, request.model, "error")
         logger.exception(f"Chat completion error: {str(e)}")
         raise HTTPException(
             status_code=500,

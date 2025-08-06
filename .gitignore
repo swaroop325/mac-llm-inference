@@ -7,10 +7,25 @@ venv/
 
 # Data and logs  
 logs/
-data/
-grafana-data/
-prometheus-data/
 *.log
+
+# Data directory - ignore runtime data but keep configs
+data/
+!data/grafana-dashboards/
+!data/grafana-dashboards/*.json
+
+# Grafana runtime data (but keep provisioning configs)
+grafana-data/
+data/grafana/data/
+data/grafana/logs/
+data/grafana/plugins/
+data/grafana/grafana.db
+data/grafana/grafana.ini
+
+# Prometheus runtime data
+prometheus-data/
+data/prometheus/
+data/mlx_server.sqlite
 
 # Python
 __pycache__/
