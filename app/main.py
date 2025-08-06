@@ -100,7 +100,7 @@ app = FastAPI(
     3. Use the chat completion endpoints
     
     ## Available Models
-    - `mlx-community/Mistral-7B-Instruct-v0.3-4bit`
+    - `mlx-community/Llama-3.2-1B-Instruct-bf16`
     
     ## Monitoring
     - Grafana: http://localhost:3000 (admin/admin)

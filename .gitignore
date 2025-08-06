@@ -2,7 +2,7 @@
 venv/
 
 # Environment and config
-.env
+# .env
 .claude/
 
 # Data and logs  

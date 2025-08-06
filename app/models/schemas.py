@@ -18,7 +18,7 @@ class ChatCompletionRequest(BaseModel):
     model: str = Field(
         ...,
         description="ID of the model to use",
-        example="mlx-community/Mistral-7B-Instruct-v0.3-4bit"
+        example="mlx-community/Llama-3.2-1B-Instruct-bf16"
     )
     messages: List[Message] = Field(
         ...,
@@ -134,7 +134,7 @@ class ModelPreloadRequest(BaseModel):
     model: str = Field(
         ...,
         description="Model identifier to preload into cache",
-        example="mlx-community/Mistral-7B-Instruct-v0.3-4bit"
+        example="mlx-community/Llama-3.2-1B-Instruct-bf16"
     )
 
 

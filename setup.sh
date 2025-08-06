@@ -114,6 +114,7 @@ fi
 # Step 7: Set Activate environment
 export MLX_FORCE_METAL=1
 export PYTHONUNBUFFERED=1
+export TOKENIZERS_PARALLELISM=false
 
 # Step 8: Verify Activate installation
 print_info "Verifying Activate installation..."

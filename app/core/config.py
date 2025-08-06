@@ -7,8 +7,6 @@ from functools import lru_cache
 class Settings(BaseSettings):
     model_config = {
         "protected_namespaces": (),
-        "env_file": ".env",
-        "env_file_encoding": "utf-8",
         "case_sensitive": False
     }
     
