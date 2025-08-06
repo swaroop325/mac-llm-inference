@@ -8,6 +8,7 @@ venv/
 # Data and logs  
 logs/
 *.log
+server.log  # Prevent uvicorn from creating log in root
 
 # Data directory - ignore runtime data but keep configs
 data/
