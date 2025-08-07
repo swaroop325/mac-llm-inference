@@ -187,6 +187,16 @@ class AuthenticationMiddleware(BaseHTTPMiddleware):
         # Add key info to request state for use in endpoints
         request.state.api_key_info = key_info
         
+        # Record API key endpoint usage
+        api_key_prefix = key_info.get('key_prefix', 'unknown')
+        api_key_name = key_info.get('key_name', 'unknown')
+        metrics_collector.record_api_key_endpoint_usage(
+            api_key_prefix=api_key_prefix,
+            api_key_name=api_key_name,
+            endpoint=request.url.path,
+            method=request.method
+        )
+        
         # Process request
         start_time = time.time()
         response = await call_next(request)

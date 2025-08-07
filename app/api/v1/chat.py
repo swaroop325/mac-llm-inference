@@ -93,12 +93,16 @@ async def chat_completion(
     """
     request_id = req.state.request_id if req else str(uuid.uuid4())
     
-    # Get API key prefix for metrics (first 8 characters for privacy)
+    # Get API key info for metrics
     api_key_prefix = "unknown"
-    if req and hasattr(req.state, 'api_key') and req.state.api_key:
-        api_key_prefix = req.state.api_key[:8] + "..."
+    api_key_name = "unknown"
+    
+    if req and hasattr(req.state, 'api_key_info') and req.state.api_key_info:
+        api_key_info = req.state.api_key_info
+        api_key_prefix = api_key_info.get('key_prefix', 'unknown')
+        api_key_name = api_key_info.get('key_name', 'unknown')
     elif req:
-        # Fallback: get from header
+        # Fallback: get from header for prefix only
         api_key = req.headers.get("X-API-Key") or req.headers.get("Authorization", "").replace("Bearer ", "")
         if api_key and len(api_key) > 8:
             api_key_prefix = api_key[:8] + "..."
@@ -166,13 +170,14 @@ async def chat_completion(
             generation_time=inference_time,
             first_token_time=first_token_time,
             api_key_prefix=api_key_prefix,
+            api_key_name=api_key_name,
             max_tokens=request.max_tokens,
             actual_tokens=actual_tokens,
             context_window=4096  # Default context window, could be model-specific
         )
         
         # Record API key request success
-        metrics_collector.record_api_key_request(api_key_prefix, request.model, "success")
+        metrics_collector.record_api_key_request(api_key_prefix, request.model, "success", api_key_name)
         
         # Record metrics
         with inference_duration.labels(model_name=request.model).time():
@@ -234,7 +239,7 @@ async def chat_completion(
     except asyncio.TimeoutError:
         metrics_collector.record_inference_end()  # Ensure we clean up inference counter
         metrics_collector.record_error("timeout", request.model, "chat_completion")
-        metrics_collector.record_api_key_request(api_key_prefix, request.model, "timeout")
+        metrics_collector.record_api_key_request(api_key_prefix, request.model, "timeout", api_key_name)
         logger.error(f"Inference timeout for request {request_id}")
         raise HTTPException(
             status_code=504,
@@ -254,7 +259,7 @@ async def chat_completion(
             error_type = "internal_error"
             
         metrics_collector.record_error(error_type, request.model, "chat_completion")
-        metrics_collector.record_api_key_request(api_key_prefix, request.model, "error")
+        metrics_collector.record_api_key_request(api_key_prefix, request.model, "error", api_key_name)
         logger.exception(f"Chat completion error: {str(e)}")
         raise HTTPException(
             status_code=500,

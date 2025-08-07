@@ -123,13 +123,32 @@ model_memory_usage_bytes = Gauge(
 api_key_token_usage = Counter(
     'api_key_token_usage_total',
     'Total tokens used per API key',
-    ['api_key_prefix', 'model_name', 'type']  # type: prompt, completion
+    ['api_key_prefix', 'api_key_name', 'model_name', 'type']  # type: prompt, completion
 )
 
 api_key_requests_total = Counter(
     'api_key_requests_total',
     'Total requests per API key',
-    ['api_key_prefix', 'model_name', 'status']
+    ['api_key_prefix', 'api_key_name', 'model_name', 'status']
+)
+
+# Enhanced API key metrics
+api_key_usage_by_endpoint = Counter(
+    'api_key_usage_by_endpoint_total',
+    'API key usage by endpoint',
+    ['api_key_prefix', 'api_key_name', 'endpoint', 'method']
+)
+
+api_key_last_used_timestamp = Gauge(
+    'api_key_last_used_timestamp_seconds',
+    'Timestamp when API key was last used',
+    ['api_key_prefix', 'api_key_name']
+)
+
+api_key_rate_limit_hits = Counter(
+    'api_key_rate_limit_hits_total',
+    'Number of times API key hit rate limits',
+    ['api_key_prefix', 'api_key_name']
 )
 
 # New useful metrics
@@ -372,7 +391,7 @@ class MetricsCollector:
 
     def record_token_metrics(self, model_name: str, prompt_tokens: int, completion_tokens: int, 
                            generation_time: float, first_token_time: float = None, api_key_prefix: str = None,
-                           max_tokens: int = None, actual_tokens: int = None, context_window: int = 4096):
+                           api_key_name: str = None, max_tokens: int = None, actual_tokens: int = None, context_window: int = 4096):
         """Record token-related metrics"""
         # Token counts
         tokens_processed_total.labels(model_name=model_name, type='prompt').inc(prompt_tokens)
@@ -384,8 +403,18 @@ class MetricsCollector:
         
         # API key token usage
         if api_key_prefix:
-            api_key_token_usage.labels(api_key_prefix=api_key_prefix, model_name=model_name, type='prompt').inc(prompt_tokens)
-            api_key_token_usage.labels(api_key_prefix=api_key_prefix, model_name=model_name, type='completion').inc(completion_tokens)
+            api_key_token_usage.labels(
+                api_key_prefix=api_key_prefix,
+                api_key_name=api_key_name or "unknown",
+                model_name=model_name,
+                type='prompt'
+            ).inc(prompt_tokens)
+            api_key_token_usage.labels(
+                api_key_prefix=api_key_prefix,
+                api_key_name=api_key_name or "unknown", 
+                model_name=model_name,
+                type='completion'
+            ).inc(completion_tokens)
         
         # Token generation rate (tokens per second)
         if generation_time > 0 and completion_tokens > 0:
@@ -406,9 +435,36 @@ class MetricsCollector:
         if max_tokens and actual_tokens and actual_tokens >= max_tokens:
             response_truncated_total.labels(model_name=model_name).inc()
 
-    def record_api_key_request(self, api_key_prefix: str, model_name: str, status: str):
+    def record_api_key_request(self, api_key_prefix: str, model_name: str, status: str, api_key_name: str = None):
         """Record API key request"""
-        api_key_requests_total.labels(api_key_prefix=api_key_prefix, model_name=model_name, status=status).inc()
+        api_key_requests_total.labels(
+            api_key_prefix=api_key_prefix,
+            api_key_name=api_key_name or "unknown",
+            model_name=model_name,
+            status=status
+        ).inc()
+        
+        # Update last used timestamp
+        api_key_last_used_timestamp.labels(
+            api_key_prefix=api_key_prefix,
+            api_key_name=api_key_name or "unknown"
+        ).set(time.time())
+    
+    def record_api_key_endpoint_usage(self, api_key_prefix: str, api_key_name: str, endpoint: str, method: str):
+        """Record API key usage by endpoint"""
+        api_key_usage_by_endpoint.labels(
+            api_key_prefix=api_key_prefix,
+            api_key_name=api_key_name or "unknown",
+            endpoint=endpoint,
+            method=method
+        ).inc()
+    
+    def record_api_key_rate_limit_hit(self, api_key_prefix: str, api_key_name: str = None):
+        """Record when an API key hits rate limits"""
+        api_key_rate_limit_hits.labels(
+            api_key_prefix=api_key_prefix,
+            api_key_name=api_key_name or "unknown"
+        ).inc()
 
     def record_error(self, error_type: str, model_name: str = "unknown", endpoint: str = "unknown"):
         """Record error with categorization"""
