@@ -19,7 +19,7 @@ else
 fi
 
 BASE_URL="http://localhost:${PORT}"
-API_KEY="mlx_VNMCwTXcikC5O0lCUHj0zRFjxWL7Zr4B1aUYB9nY_XE"
+API_KEY="llm_VNMCwTXcikC5O0lCUHj0zRFjxWL7Zr4B1aUYB9nY_XE"
 CONCURRENT=3        # Concurrent requests per batch
 TOTAL=30           # Total requests
 DELAY=2            # 2 seconds between batches
@@ -381,7 +381,7 @@ while [[ $# -gt 0 ]]; do
             shift 2
             ;;
         -h|--help)
-            echo "MLX Comprehensive Load Test"
+            echo "LLM Comprehensive Load Test"
             echo ""
             echo "Usage: $0 [OPTIONS]"
             echo ""

@@ -22,7 +22,7 @@ def setup_logging() -> logging.Logger:
     settings = get_settings()
     
     # Create logger
-    logger = logging.getLogger("mlx_server")
+    logger = logging.getLogger("llm_server")
     logger.setLevel(getattr(logging, settings.log_level.upper()))
     
     # Remove existing handlers

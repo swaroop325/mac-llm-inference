@@ -4,7 +4,6 @@ from typing import Dict, Any
 import time
 import os
 
-# Conditional MLX import
 try:
     if os.getenv("INFERENCE_BACKEND", "auto") == "mlx":
         import mlx.core as mx

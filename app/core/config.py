@@ -10,7 +10,7 @@ class Settings(BaseSettings):
         "case_sensitive": False
     }
     
-    app_name: str = "Activate LLM Inference Server"
+    app_name: str = "LLM Inference Server"
     app_version: str = "1.0.0"
     debug: bool = False
     
@@ -21,7 +21,7 @@ class Settings(BaseSettings):
     
     # Model Configuration
     model_path: str = "mlx-community/Llama-3.2-1B-Instruct"
-    model_cache_dir: Optional[str] = os.path.expanduser("~/.cache/mlx-models")
+    model_cache_dir: Optional[str] = os.path.expanduser("~/.cache/llm-models")
     max_model_cache_size: int = 5  # Maximum number of models to keep in memory
     
     # Inference Configuration
@@ -49,7 +49,7 @@ class Settings(BaseSettings):
     # Logging
     log_level: str = "INFO"
     log_format: str = "json"
-    log_file: Optional[str] = "logs/mlx_server.log"
+    log_file: Optional[str] = "logs/llm_server.log"
     
     # Monitoring
     enable_metrics: bool = True

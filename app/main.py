@@ -102,7 +102,7 @@ app = FastAPI(
     title=settings.app_name,
     version=settings.app_version,
     description="""
-    # Activate LLM Inference Server
+    # LLM Inference Server
     
     Enterprise-grade LLM inference server with OpenAI-compatible API endpoints.
     
@@ -119,7 +119,7 @@ app = FastAPI(
     - Prometheus: http://localhost:9090
     """,
     contact={
-        "name": "Activate LLM Inference Server",
+        "name": "LLM Inference Server",
         "url": "https://github.com/ml-explore/mlx",
     },
     license_info={
@@ -150,7 +150,7 @@ def custom_openapi():
             "type": "http",
             "scheme": "bearer",
             "bearerFormat": "API Key",
-            "description": "Enter your API key (starts with mlx_)"
+            "description": "Enter your API key (starts with llm_)"
         }
     }
     

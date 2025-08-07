@@ -1,9 +1,9 @@
 apiVersion: 1
 
 providers:
-  - name: 'MLX Monitoring Dashboards'
+  - name: 'LLM Monitoring Dashboards'
     orgId: 1
-    folder: 'MLX Server'
+    folder: 'LLM Server'
     type: file
     disableDeletion: false  # Allows deletion via API/filesystem
     updateIntervalSeconds: 30  # Reduced frequency to minimize UI conflicts

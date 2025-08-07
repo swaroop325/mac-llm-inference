@@ -1,8 +1,8 @@
 {
   "id": null,
-  "title": "MLX Inference Server - Complete Monitoring",
+  "title": "LLM Inference Server - Complete Monitoring",
   "description": "Comprehensive monitoring dashboard with all telemetry metrics",
-  "tags": ["mlx", "inference", "metrics", "comprehensive"],
+  "tags": ["llm", "inference", "metrics", "comprehensive"],
   "timezone": "browser",
   "refresh": "10s",
   "time": {

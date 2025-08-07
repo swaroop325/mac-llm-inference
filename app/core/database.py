@@ -15,7 +15,7 @@ settings = get_settings()
 class DatabaseManager:
     """Manages SQLite database operations for API keys."""
     
-    def __init__(self, db_path: str = "data/mlx_server.sqlite"):
+    def __init__(self, db_path: str = "data/llm_server.sqlite"):
         self.db_path = Path(db_path)
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
         self._init_database()
@@ -93,7 +93,7 @@ class DatabaseManager:
     @staticmethod
     def generate_api_key() -> tuple[str, str]:
         """Generate a new API key with prefix."""
-        prefix = "mlx_"
+        prefix = "llm_"
         key_part = secrets.token_urlsafe(32)
         full_key = f"{prefix}{key_part}"
         return full_key, prefix

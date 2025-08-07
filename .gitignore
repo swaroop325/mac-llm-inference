@@ -26,7 +26,7 @@ data/grafana/grafana.ini
 # Prometheus runtime data
 prometheus-data/
 data/prometheus/
-data/mlx_server.sqlite
+data/llm_server.sqlite
 
 # Python
 __pycache__/

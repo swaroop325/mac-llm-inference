@@ -1,5 +1,5 @@
 #!/bin/bash
-# Unified setup and run script for Activate LLM Inference Server
+# Unified setup and run script for LLM Inference Server
 
 set -e  # Exit on error
 
@@ -64,7 +64,7 @@ for arg in "$@"; do
     esac
 done
 
-print_info "Starting Activate LLM Inference Server setup (Mode: $MODE)"
+print_info "Starting LLM Inference Server setup (Mode: $MODE)"
 
 # Step 1: Check Python version
 PYTHON_VERSION=$(python3 --version 2>&1 | awk '{print $2}')
@@ -222,13 +222,13 @@ if [ "$ENABLE_GRAFANA" = "yes" ]; then
     mkdir -p data/grafana-dashboards
     
     # Check if dashboard exists, if not create a basic one
-    if [ ! -f "data/grafana-dashboards/mlx-dashboard.json" ]; then
+    if [ ! -f "data/grafana-dashboards/llm-dashboard.json" ]; then
         print_warn "Dashboard file not found, creating basic dashboard..."
-        cat > data/grafana-dashboards/mlx-dashboard.json << 'EOF'
+        cat > data/grafana-dashboards/llm-dashboard.json << 'EOF'
 {
   "id": null,
-  "title": "MLX Inference Server - Basic",
-  "tags": ["mlx", "inference", "metrics"],
+  "title": "LLM Inference Server - Basic",
+  "tags": ["llm", "inference", "metrics"],
   "timezone": "browser",
   "refresh": "10s",
   "time": {"from": "now-1h", "to": "now"},
@@ -291,7 +291,7 @@ EOF
 fi
 
 # Step 12: Start main server
-print_info "Starting Activate LLM Inference Server on port $PORT..."
+print_info "Starting LLM Inference Server on port $PORT..."
 echo ""
 
 if [ "$ENABLE_PROMETHEUS" = "yes" ] || [ "$ENABLE_GRAFANA" = "yes" ]; then
@@ -323,7 +323,7 @@ if [ "$ENABLE_PROMETHEUS" = "yes" ] || [ "$ENABLE_GRAFANA" = "yes" ]; then
         print_info "  ✅ Prometheus data source automatically configured"
         print_info "  ✅ Activate Dashboard automatically imported and ready"
         print_info "  🔑 Login: admin/admin (change password when prompted)"
-        print_info "  📊 Dashboard: Activate LLM Inference Server Dashboard"
+        print_info "  📊 Dashboard: LLM Inference Server Dashboard"
         echo ""
     fi
 fi

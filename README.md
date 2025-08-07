@@ -1,4 +1,4 @@
-# Activate LLM Inference Server
+# LLM Inference Server
 
 Enterprise-grade LLM inference server built with Activate and FastAPI, providing an OpenAI-compatible API with production-ready features.
 
@@ -18,7 +18,7 @@ Enterprise-grade LLM inference server built with Activate and FastAPI, providing
 1. **Clone and Setup**
 ```bash
 git clone <repository>
-cd mlx-inference-server
+cd llm-inference-server
 ./setup.sh  # Starts server + Prometheus automatically
 ```
 
@@ -83,7 +83,7 @@ See `.env.example` for all options.
 ## Architecture
 
 ```
-mlx-inference-server/
+llm-inference-server/
 ├── app/                        # Main application code
 │   ├── api/v1/                # API endpoints  
 │   ├── core/                  # Configuration, logging
