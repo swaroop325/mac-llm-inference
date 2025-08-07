@@ -1,8 +1,8 @@
 import asyncio
-from typing import Dict, Optional, Tuple, Any
+import os
+import platform
+from typing import Dict, Optional, Tuple, Any, AsyncGenerator
 from collections import OrderedDict
-import mlx.core as mx
-from mlx_lm import load, generate
 import psutil
 import threading
 import time
@@ -10,15 +10,87 @@ import time
 from app.core.config import get_settings
 from app.core.logging import logger
 
+# Backend detection and imports
+def detect_backend():
+    """Detect which backend to use based on platform and available libraries"""
+    backend = os.getenv("INFERENCE_BACKEND", "auto").lower()
+    
+    if backend != "auto":
+        return backend
+    
+    # Check if we're on Apple Silicon
+    if platform.system() == "Darwin" and platform.processor() == "arm":
+        try:
+            import mlx.core as mx
+            return "mlx"
+        except ImportError:
+            logger.warning("MLX not available on Apple Silicon, falling back to vLLM")
+    
+    # Try vLLM for other platforms
+    try:
+        import vllm
+        return "vllm"
+    except ImportError:
+        logger.warning("vLLM not available, using CPU fallback")
+        return "cpu"
+
+BACKEND = detect_backend()
+logger.info(f"Using inference backend: {BACKEND}")
+
+# Import appropriate modules based on backend
+if BACKEND == "mlx":
+    try:
+        import mlx.core as mx
+        from mlx_lm import load, generate
+        logger.info("MLX backend loaded successfully")
+    except ImportError as e:
+        logger.error(f"Failed to import MLX: {e}")
+        BACKEND = "cpu"
+
+elif BACKEND == "vllm":
+    try:
+        from vllm import LLM, SamplingParams
+        from vllm.engine.arg_utils import AsyncEngineArgs
+        from vllm.engine.async_llm_engine import AsyncLLMEngine
+        from vllm.utils import random_uuid
+        logger.info("vLLM backend loaded successfully")
+    except ImportError as e:
+        logger.error(f"Failed to import vLLM: {e}")
+        BACKEND = "cpu"
+
+# CPU fallback imports
+if BACKEND == "cpu":
+    try:
+        from transformers import AutoTokenizer, AutoModelForCausalLM, pipeline
+        logger.info("Using Transformers CPU backend")
+    except ImportError as e:
+        logger.error(f"Failed to import Transformers: {e}")
+        # Keep MLX as fallback if available
+        if platform.system() == "Darwin":
+            try:
+                import mlx.core as mx
+                from mlx_lm import load, generate
+                BACKEND = "mlx"
+                logger.info("Falling back to MLX")
+            except ImportError:
+                raise RuntimeError("No suitable inference backend available")
+
 
 class ModelManager:
     def __init__(self):
         self.settings = get_settings()
-        self._models_cache: OrderedDict[str, Tuple[Any, Any]] = OrderedDict()
+        self.backend = BACKEND
+        self._models_cache: OrderedDict[str, Any] = OrderedDict()
         self._cache_lock = threading.Lock()
         self._loading_locks: Dict[str, threading.Lock] = {}
         self._last_access: Dict[str, float] = {}
         self._load_times: Dict[str, float] = {}
+        
+        # Backend-specific initialization
+        if self.backend == "vllm":
+            self._vllm_engines: Dict[str, Any] = {}
+        
+        logger.info(f"ModelManager initialized with {self.backend} backend")
         
     def _get_memory_usage(self) -> Dict[str, float]:
         """Get current memory usage statistics"""
@@ -98,17 +170,12 @@ class ModelManager:
             start_memory = psutil.virtual_memory().used
             
             try:
-                # Run model loading in thread pool to avoid blocking
-                loop = asyncio.get_event_loop()
-                model, tokenizer = await loop.run_in_executor(
-                    None, 
-                    load, 
-                    model_name
-                )
+                # Load model based on backend
+                model_data = await self._load_model_backend_specific(model_name)
                 
                 load_time = time.time() - start_time
                 self._load_times[model_name] = load_time
-                logger.info(f"Model {model_name} loaded in {load_time:.2f}s")
+                logger.info(f"Model {model_name} loaded in {load_time:.2f}s using {self.backend} backend")
                 
                 # Check if we need to evict before adding
                 while self._should_evict_model():
@@ -116,7 +183,7 @@ class ModelManager:
                 
                 # Add to cache
                 with self._cache_lock:
-                    self._models_cache[model_name] = (model, tokenizer)
+                    self._models_cache[model_name] = model_data
                     self._last_access[model_name] = time.time()
                 
                 # Estimate memory usage (rough calculation)
@@ -130,7 +197,7 @@ class ModelManager:
                 # Record that model was loaded
                 metrics_collector.record_model_loaded(model_name)
                 
-                return model, tokenizer
+                return model_data
                 
             except Exception as e:
                 logger.error(f"Failed to load model {model_name}: {str(e)}")
@@ -172,6 +239,45 @@ class ModelManager:
         
         return response
 
+    async def _load_model_backend_specific(self, model_name: str) -> Any:
+        """Backend-specific model loading"""
+        
+        if self.backend == "mlx":
+            # MLX loading (synchronous, run in thread pool)
+            def load_mlx_model():
+                return load(model_name)
+            
+            loop = asyncio.get_event_loop()
+            return await loop.run_in_executor(None, load_mlx_model)
+        
+        elif self.backend == "vllm":
+            # vLLM loading
+            engine_args = AsyncEngineArgs(
+                model=model_name,
+                tensor_parallel_size=1,
+                dtype="auto",
+                max_model_len=getattr(self.settings, 'max_model_len', 2048),
+                gpu_memory_utilization=getattr(self.settings, 'gpu_memory_fraction', 0.8),
+                disable_log_stats=True
+            )
+            
+            engine = AsyncLLMEngine.from_engine_args(engine_args)
+            self._vllm_engines[model_name] = engine
+            return engine
+        
+        elif self.backend == "cpu":
+            # CPU loading with Transformers
+            def load_cpu_model():
+                tokenizer = AutoTokenizer.from_pretrained(model_name)
+                model = AutoModelForCausalLM.from_pretrained(model_name)
+                return {"tokenizer": tokenizer, "model": model}
+            
+            loop = asyncio.get_event_loop()
+            return await loop.run_in_executor(None, load_cpu_model)
+        
+        else:
+            raise ValueError(f"Unsupported backend: {self.backend}")
+
     async def generate_response(
         self, 
         model_name: str, 
@@ -182,18 +288,65 @@ class ModelManager:
         **kwargs
     ) -> str:
         """Generate response using the specified model"""
-        model, tokenizer = await self.get_model(model_name)
+        model_data = await self.get_model(model_name)
         
-        # Run generation in thread pool
-        loop = asyncio.get_event_loop()
-        response = await loop.run_in_executor(
-            None,
-            generate,
-            model,
-            tokenizer,
-            prompt,
-            {"temp": temperature, "max_tokens": max_tokens, "top_p": top_p}
-        )
+        if self.backend == "mlx":
+            # MLX generation
+            model, tokenizer = model_data
+            loop = asyncio.get_event_loop()
+            response = await loop.run_in_executor(
+                None,
+                generate,
+                model,
+                tokenizer,
+                prompt,
+                {"temp": temperature, "max_tokens": max_tokens, "top_p": top_p}
+            )
+        
+        elif self.backend == "vllm":
+            # vLLM generation
+            engine = model_data
+            sampling_params = SamplingParams(
+                temperature=temperature,
+                max_tokens=max_tokens,
+                top_p=top_p,
+                stop=["User:", "Human:"]
+            )
+            
+            request_id = random_uuid()
+            results = []
+            async for result in engine.generate(prompt, sampling_params, request_id):
+                results.append(result)
+            
+            if results:
+                response = results[-1].outputs[0].text
+            else:
+                response = ""
+        
+        elif self.backend == "cpu":
+            # CPU generation with Transformers
+            tokenizer = model_data["tokenizer"]
+            model = model_data["model"]
+            
+            def cpu_generate():
+                generator = pipeline(
+                    "text-generation",
+                    model=model,
+                    tokenizer=tokenizer,
+                    max_new_tokens=max_tokens,
+                    temperature=temperature,
+                    do_sample=True,
+                    pad_token_id=tokenizer.eos_token_id
+                )
+                
+                result = generator(prompt, return_full_text=False)
+                return result[0]["generated_text"]
+            
+            loop = asyncio.get_event_loop()
+            response = await loop.run_in_executor(None, cpu_generate)
+        
+        else:
+            raise ValueError(f"Unsupported backend: {self.backend}")
         
         # Clean and post-process the response
         cleaned_response = self._clean_response(response)

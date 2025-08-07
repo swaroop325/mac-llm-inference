@@ -1,9 +1,17 @@
 from prometheus_client import Counter, Histogram, Gauge, generate_latest
 import psutil
-import mlx.core as mx
 from typing import Dict, Any
 import time
 import os
+
+# Conditional MLX import
+try:
+    if os.getenv("INFERENCE_BACKEND", "auto") == "mlx":
+        import mlx.core as mx
+    else:
+        mx = None
+except ImportError:
+    mx = None
 
 from app.core.config import get_settings
 
@@ -300,9 +308,7 @@ class MetricsCollector:
         
         # MLX GPU memory tracking
         try:
-            import mlx.core as mx
-            # Try to get MLX memory info
-            if mx.default_device().type.name == "gpu":
+            if mx and mx.default_device().type.name == "gpu":
                 # MLX doesn't directly expose GPU memory, but we can try system tools
                 try:
                     # For Apple Silicon, we can use system_profiler or Activity Monitor APIs

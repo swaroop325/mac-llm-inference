@@ -1,17 +1,21 @@
 #!/bin/bash
 
-# MLX Inference Server Comprehensive Load Test
+# Universal Inference Server Comprehensive Load Test
 # Tests all metrics including API key usage, model switching, and various scenarios
+# Supports MLX, vLLM, and CPU backends with appropriate model selection
 
 set -e
 
 # Configuration
-# Read port from .env file if available
+# Read configuration from .env file if available
 if [[ -f .env ]]; then
     PORT=$(grep "^PORT=" .env | cut -d'=' -f2)
     PORT=${PORT:-8000}  # Default to 8000 if not found
+    BACKEND=$(grep "^INFERENCE_BACKEND=" .env | cut -d'=' -f2)
+    BACKEND=${BACKEND:-auto}  # Default to auto if not found
 else
     PORT=8000
+    BACKEND=auto
 fi
 
 BASE_URL="http://localhost:${PORT}"
@@ -28,12 +32,30 @@ BLUE='\033[0;34m'
 PURPLE='\033[0;35m'
 NC='\033[0m' # No Color
 
-# Multiple models to test model switching
-MODELS=(
-    "microsoft/Phi-3-mini-4k-instruct-4bit"
-    "mlx-community/Llama-3.2-1B-Instruct-bf16"
-    "microsoft/Phi-3-mini-4k-instruct-4bit"  # Switch back to create switching metrics
-)
+# Multiple models to test model switching - dynamically set based on backend
+if [[ "$BACKEND" == "mlx" ]]; then
+    MODELS=(
+        "mlx-community/Llama-3.2-1B-Instruct-bf16"
+        "mlx-community/Qwen2.5-0.5B-Instruct-4bit"
+        "mlx-community/Llama-3.2-1B-Instruct-bf16"  # Switch back to create switching metrics
+    )
+    echo -e "${BLUE}Using MLX-optimized models${NC}"
+elif [[ "$BACKEND" == "vllm" ]]; then
+    MODELS=(
+        "microsoft/Phi-3-mini-4k-instruct"
+        "meta-llama/Llama-3.2-1B-Instruct"  
+        "microsoft/Phi-3-mini-4k-instruct"  # Switch back to create switching metrics
+    )
+    echo -e "${BLUE}Using vLLM-compatible models${NC}"
+else
+    # CPU or auto backend
+    MODELS=(
+        "microsoft/Phi-3-mini-4k-instruct"
+        "meta-llama/Llama-3.2-1B-Instruct"
+        "microsoft/Phi-3-mini-4k-instruct"  # Switch back to create switching metrics
+    )
+    echo -e "${BLUE}Using CPU-compatible models (backend: $BACKEND)${NC}"
+fi
 
 # Diverse test scenarios to populate all metrics
 TEST_SCENARIOS=(
@@ -187,7 +209,7 @@ run_concurrent_batch() {
 
 # Function to check system status (simplified)
 check_system_status() {
-    echo -e "${BLUE}Checking MLX server process...${NC}"
+    echo -e "${BLUE}Checking inference server process...${NC}"
     
     # Check if server process is running
     if pgrep -f uvicorn >/dev/null; then
@@ -251,10 +273,11 @@ show_metrics_summary() {
 # Main execution function
 main() {
     echo -e "${BLUE}╔══════════════════════════════════════╗${NC}"
-    echo -e "${BLUE}║     MLX Comprehensive Load Test      ║${NC}"
+    echo -e "${BLUE}║   Universal Comprehensive Load Test  ║${NC}"
     echo -e "${BLUE}╚══════════════════════════════════════╝${NC}"
     echo ""
     echo -e "🎯 Target: $BASE_URL"
+    echo -e "🧠 Backend: $BACKEND"
     echo -e "⚡ Concurrent: $CONCURRENT requests"
     echo -e "📊 Total: $TOTAL requests"
     echo -e "⏱️ Delay: ${DELAY}s between batches"

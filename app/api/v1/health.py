@@ -1,7 +1,16 @@
 from fastapi import APIRouter, Response
-import mlx.core as mx
 import psutil
 from datetime import datetime
+import os
+
+# Conditional MLX import
+try:
+    if os.getenv("INFERENCE_BACKEND", "auto") == "mlx":
+        import mlx.core as mx
+    else:
+        mx = None
+except ImportError:
+    mx = None
 
 from app.models.schemas import HealthResponse, MetricsResponse
 from app.services.model_manager import model_manager
@@ -37,8 +46,13 @@ async def health_check():
     and system resources to determine overall server health.
     """
     try:
-        # Check if Activate is available and GPU is accessible
-        gpu_available = mx.default_device().type.name == "gpu"
+        # Check backend and device availability
+        if mx:
+            gpu_available = mx.default_device().type.name == "gpu"
+            device_name = mx.default_device().type.name
+        else:
+            gpu_available = False
+            device_name = os.getenv("INFERENCE_BACKEND", "cpu")
         
         # Get model cache info
         cache_info = model_manager.get_cache_info()
@@ -49,7 +63,7 @@ async def health_check():
         cpu_percent = psutil.cpu_percent(interval=0.1)
         
         details = {
-            "gpu_device": mx.default_device().type.name,
+            "device": device_name,
             "cached_models": cache_info["cached_models"],
             "memory_usage_percent": memory.percent,
             "cpu_usage_percent": cpu_percent,

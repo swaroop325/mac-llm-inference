@@ -2,9 +2,18 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from fastapi.openapi.utils import get_openapi
 from contextlib import asynccontextmanager
-import mlx.core as mx
 import time
 import asyncio
+import os
+
+# Conditional MLX import
+try:
+    if os.getenv("INFERENCE_BACKEND", "auto") == "mlx":
+        import mlx.core as mx
+    else:
+        mx = None
+except ImportError:
+    mx = None
 
 from app.core.config import get_settings
 from app.core.logging import logger
@@ -27,7 +36,10 @@ async def lifespan(app: FastAPI):
     """Manage application lifecycle"""
     # Startup
     logger.info(f"Starting {settings.app_name} v{settings.app_version}")
-    logger.info(f"Activate device: {mx.default_device().type.name}")
+    if mx:
+        logger.info(f"MLX device: {mx.default_device().type.name}")
+    else:
+        logger.info(f"Backend: {os.getenv('INFERENCE_BACKEND', 'auto')}")
     logger.info(f"Debug mode: {settings.debug}")
     logger.info(f"API authentication: {'enabled' if settings.api_keys else 'disabled'}")
     

@@ -1,7 +1,6 @@
 # Core dependencies
 fastapi==0.115.0
 uvicorn[standard]==0.30.6
-mlx-lm>=0.19.0
 
 # Pydantic and validation
 pydantic==2.9.2
@@ -15,6 +14,9 @@ aiofiles==24.1.0
 prometheus-client==0.21.0
 psutil==6.1.0
 
+# Database
+aiosqlite==0.19.0
+
 # Logging
 python-json-logger==2.0.7
 
@@ -24,3 +26,22 @@ cryptography==43.0.3
 
 # Development
 python-dotenv==1.0.1
+
+# Backend-specific dependencies
+# MLX (Apple Silicon) - install only on macOS ARM64
+mlx>=0.0.6; platform_machine=="arm64" and sys_platform=="darwin"
+mlx-lm>=0.19.0; platform_machine=="arm64" and sys_platform=="darwin"
+
+# vLLM (GPU) - install on non-Apple platforms with compatible transformers
+vllm>=0.2.0,<0.7.0; platform_machine!="arm64" or sys_platform!="darwin"
+
+# CPU fallback (always install as fallback) - version compatible with vLLM
+transformers>=4.35.0,<4.46.0
+torch>=2.1.0
+tokenizers>=0.15.0
+accelerate>=0.24.0
+
+# Testing
+pytest>=7.4.0
+pytest-asyncio>=0.21.0
+httpx>=0.25.0
