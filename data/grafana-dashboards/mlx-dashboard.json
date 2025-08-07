@@ -614,28 +614,58 @@
     },
     {
       "id": 24,
-      "title": "Top P Distribution",
+      "title": "Error Rate by Type",
       "type": "timeseries",
       "targets": [
         {
-          "expr": "histogram_quantile(0.50, rate(top_p_distribution_bucket[5m]))",
-          "legendFormat": "P50 Top P"
+          "expr": "rate(errors_total[5m])",
+          "legendFormat": "{{error_type}} - {{model_name}}"
         },
         {
-          "expr": "histogram_quantile(0.95, rate(top_p_distribution_bucket[5m]))",
-          "legendFormat": "P95 Top P"
+          "expr": "sum by (error_type) (rate(errors_total[5m]))",
+          "legendFormat": "Total {{error_type}}"
         }
       ],
       "gridPos": {"h": 8, "w": 12, "x": 12, "y": 48},
       "fieldConfig": {
         "defaults": {
-          "unit": "short",
+          "unit": "reqps",
+          "min": 0,
           "custom": {
             "drawStyle": "line",
             "lineWidth": 2,
-            "fillOpacity": 10
+            "fillOpacity": 15,
+            "stacking": {"mode": "normal"}
+          },
+          "color": {"mode": "palette-classic"},
+          "thresholds": {
+            "steps": [
+              {"color": "green", "value": null},
+              {"color": "yellow", "value": 0.1},
+              {"color": "red", "value": 1.0}
+            ]
           }
-        }
+        },
+        "overrides": [
+          {
+            "matcher": {"id": "byRegexp", "options": ".*timeout.*"},
+            "properties": [
+              {"id": "color", "value": {"mode": "fixed", "fixedColor": "orange"}}
+            ]
+          },
+          {
+            "matcher": {"id": "byRegexp", "options": ".*memory.*|.*oom.*"},
+            "properties": [
+              {"id": "color", "value": {"mode": "fixed", "fixedColor": "red"}}
+            ]
+          },
+          {
+            "matcher": {"id": "byRegexp", "options": ".*gpu.*|.*cuda.*"},
+            "properties": [
+              {"id": "color", "value": {"mode": "fixed", "fixedColor": "purple"}}
+            ]
+          }
+        ]
       }
     },
     {
@@ -701,48 +731,106 @@
     },
     {
       "id": 26,
-      "title": "Rejected Requests Rate",
+      "title": "Request Success Rate",
       "type": "timeseries",
       "targets": [
         {
-          "expr": "rate(rejected_requests_total[5m])",
-          "legendFormat": "{{reason}}"
+          "expr": "rate(http_requests_total{endpoint=~\"/v1/.*\",status=~\"2..\"}[5m]) / rate(http_requests_total{endpoint=~\"/v1/.*\"}[5m]) * 100",
+          "legendFormat": "Success Rate %"
+        },
+        {
+          "expr": "rate(http_requests_total{endpoint=~\"/v1/.*\",status=~\"4..|5..\"}[5m]) / rate(http_requests_total{endpoint=~\"/v1/.*\"}[5m]) * 100",
+          "legendFormat": "Error Rate %"
         }
       ],
       "gridPos": {"h": 8, "w": 8, "x": 0, "y": 64},
       "fieldConfig": {
         "defaults": {
-          "unit": "short",
+          "unit": "percent",
+          "min": 0,
+          "max": 100,
           "custom": {
             "drawStyle": "line",
             "lineWidth": 2,
-            "fillOpacity": 20,
-            "stacking": {"mode": "normal"}
+            "fillOpacity": 10
+          },
+          "thresholds": {
+            "steps": [
+              {"color": "red", "value": null},
+              {"color": "yellow", "value": 90},
+              {"color": "green", "value": 95}
+            ]
           }
-        }
+        },
+        "overrides": [
+          {
+            "matcher": {"id": "byName", "options": "Success Rate %"},
+            "properties": [
+              {"id": "color", "value": {"mode": "fixed", "fixedColor": "green"}}
+            ]
+          },
+          {
+            "matcher": {"id": "byName", "options": "Error Rate %"},
+            "properties": [
+              {"id": "color", "value": {"mode": "fixed", "fixedColor": "red"}}
+            ]
+          }
+        ]
       }
     },
     {
       "id": 11,
-      "title": "Error Rate by Type",
+      "title": "Token Generation Rate",
       "type": "timeseries",
       "targets": [
         {
-          "expr": "sum(rate(errors_total[5m])) by (error_type)",
-          "legendFormat": "{{error_type}}"
+          "expr": "histogram_quantile(0.50, rate(token_generation_rate_tokens_per_second_bucket[5m]))",
+          "legendFormat": "P50 Tokens/sec"
+        },
+        {
+          "expr": "histogram_quantile(0.95, rate(token_generation_rate_tokens_per_second_bucket[5m]))",
+          "legendFormat": "P95 Tokens/sec"
+        },
+        {
+          "expr": "rate(tokens_processed_total{type=\"completion\"}[5m])",
+          "legendFormat": "Completion Tokens/sec - {{model_name}}"
         }
       ],
       "gridPos": {"h": 8, "w": 8, "x": 8, "y": 64},
       "fieldConfig": {
         "defaults": {
-          "unit": "short",
+          "unit": "tokensps",
+          "min": 0,
           "custom": {
             "drawStyle": "line",
             "lineWidth": 2,
-            "fillOpacity": 20
+            "fillOpacity": 10
           },
-          "color": {"mode": "palette-classic"}
-        }
+          "color": {"mode": "palette-classic"},
+          "thresholds": {
+            "steps": [
+              {"color": "red", "value": null},
+              {"color": "yellow", "value": 10},
+              {"color": "green", "value": 50}
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {"id": "byRegexp", "options": "P50.*"},
+            "properties": [
+              {"id": "custom.lineWidth", "value": 3},
+              {"id": "color", "value": {"mode": "fixed", "fixedColor": "blue"}}
+            ]
+          },
+          {
+            "matcher": {"id": "byRegexp", "options": "P95.*"},
+            "properties": [
+              {"id": "custom.lineWidth", "value": 2},
+              {"id": "color", "value": {"mode": "fixed", "fixedColor": "orange"}}
+            ]
+          }
+        ]
       }
     },
     {
