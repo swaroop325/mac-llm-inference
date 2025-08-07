@@ -127,6 +127,9 @@ class ModelManager:
                 from app.utils.metrics import model_memory_usage_bytes
                 model_memory_usage_bytes.labels(model_name=model_name).set(estimated_model_memory)
                 
+                # Record that model was loaded
+                metrics_collector.record_model_loaded(model_name)
+                
                 return model, tokenizer
                 
             except Exception as e:

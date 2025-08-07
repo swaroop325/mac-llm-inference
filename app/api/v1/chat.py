@@ -14,7 +14,14 @@ from app.models.schemas import (
     ErrorResponse
 )
 from app.services.model_manager import model_manager
-from app.utils.metrics import metrics_collector, inference_duration
+from app.utils.metrics import (
+    metrics_collector, 
+    inference_duration,
+    temperature_distribution,
+    top_p_distribution,
+    request_size_bytes,
+    response_size_bytes
+)
 from app.core.logging import logger
 from app.core.config import get_settings
 
@@ -108,9 +115,20 @@ async def chat_completion(
     )
     
     try:
+        # Record request size
+        import json
+        request_bytes = len(json.dumps(request.dict()))
+        
         # Extract prompt from messages
         prompt = extract_prompt(request.messages)
         prompt_tokens = count_tokens(prompt)
+        
+        # Record sampling parameters
+        metrics_collector.record_sampling_params(
+            model_name=request.model,
+            temperature=request.temperature,
+            top_p=request.top_p
+        )
         
         # Record inference start
         metrics_collector.record_inference_start()
@@ -136,9 +154,10 @@ async def chat_completion(
         # Record inference end
         metrics_collector.record_inference_end()
         
-        # Record token metrics
-        # Note: For simplicity, we'll use inference_time as first_token_time
-        # In a streaming implementation, you'd track actual first token time
+        # Check if response was truncated
+        actual_tokens = count_tokens(response_text)
+        
+        # Record token metrics with context window info
         first_token_time = min(0.1, inference_time)  # Estimate first token time
         metrics_collector.record_token_metrics(
             model_name=request.model,
@@ -146,7 +165,10 @@ async def chat_completion(
             completion_tokens=completion_tokens,
             generation_time=inference_time,
             first_token_time=first_token_time,
-            api_key_prefix=api_key_prefix
+            api_key_prefix=api_key_prefix,
+            max_tokens=request.max_tokens,
+            actual_tokens=actual_tokens,
+            context_window=4096  # Default context window, could be model-specific
         )
         
         # Record API key request success
@@ -155,6 +177,29 @@ async def chat_completion(
         # Record metrics
         with inference_duration.labels(model_name=request.model).time():
             pass  # Metric already recorded
+        
+        # Record response size
+        response_json = {
+            "id": f"chatcmpl-{request_id}",
+            "model": request.model,
+            "choices": [{
+                "index": 0,
+                "message": {"role": "assistant", "content": response_text},
+                "finish_reason": "stop" if len(response_text) < request.max_tokens else "length"
+            }],
+            "usage": {
+                "prompt_tokens": prompt_tokens,
+                "completion_tokens": completion_tokens,
+                "total_tokens": prompt_tokens + completion_tokens
+            }
+        }
+        response_bytes = len(json.dumps(response_json))
+        
+        metrics_collector.record_request_size(
+            endpoint="/v1/chat/completions",
+            request_bytes=request_bytes,
+            response_bytes=response_bytes
+        )
         
         # Build response
         response = ChatCompletionResponse(

@@ -68,7 +68,7 @@ async def start_metrics_collection():
     
     while True:
         try:
-            # Update memory and system metrics
+            # Update memory and system metrics more frequently
             metrics_collector.update_memory_metrics()
             
             # Update model cache metrics
@@ -76,13 +76,13 @@ async def start_metrics_collection():
             from app.utils.metrics import model_cache_size
             model_cache_size.set(cache_info["cache_size"])
             
-            # Wait 10 seconds before next update
-            await asyncio.sleep(10)
+            # Wait only 2 seconds for more real-time updates
+            await asyncio.sleep(2)
         except asyncio.CancelledError:
             break
         except Exception as e:
             logger.warning(f"Error updating metrics: {e}")
-            await asyncio.sleep(30)  # Wait longer on error
+            await asyncio.sleep(10)  # Shorter error retry interval
 
 
 # Create FastAPI app

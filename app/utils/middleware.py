@@ -11,6 +11,7 @@ from app.core.config import get_settings
 from app.core.logging import logger
 from app.models.schemas import ErrorResponse
 from app.core.database import db_manager
+from app.utils.metrics import metrics_collector, active_requests, request_count, request_duration
 
 
 class RequestIdMiddleware(BaseHTTPMiddleware):
@@ -29,23 +30,50 @@ class RequestIdMiddleware(BaseHTTPMiddleware):
             }
         )
         
+        # Real-time metric: increment active requests immediately
+        active_requests.inc()
+        
         start_time = time.time()
-        response = await call_next(request)
-        process_time = time.time() - start_time
-        
-        response.headers["X-Request-ID"] = request_id
-        response.headers["X-Process-Time"] = str(process_time)
-        
-        logger.info(
-            f"Request completed",
-            extra={
-                "request_id": request_id,
-                "status_code": response.status_code,
-                "process_time": process_time
-            }
-        )
-        
-        return response
+        try:
+            response = await call_next(request)
+            process_time = time.time() - start_time
+            
+            response.headers["X-Request-ID"] = request_id
+            response.headers["X-Process-Time"] = str(process_time)
+            
+            # Real-time metrics: record request metrics immediately
+            request_count.labels(
+                method=request.method,
+                endpoint=request.url.path,
+                status=str(response.status_code)
+            ).inc()
+            
+            request_duration.labels(
+                method=request.method,
+                endpoint=request.url.path
+            ).observe(process_time)
+            
+            # Also update metrics collector for aggregated metrics
+            metrics_collector.record_request(
+                method=request.method,
+                endpoint=request.url.path,
+                status=response.status_code,
+                duration=process_time
+            )
+            
+            logger.info(
+                f"Request completed",
+                extra={
+                    "request_id": request_id,
+                    "status_code": response.status_code,
+                    "process_time": process_time
+                }
+            )
+            
+            return response
+        finally:
+            # Real-time metric: decrement active requests
+            active_requests.dec()
 
 
 class ErrorHandlingMiddleware(BaseHTTPMiddleware):
@@ -55,6 +83,11 @@ class ErrorHandlingMiddleware(BaseHTTPMiddleware):
             return response
         except asyncio.TimeoutError:
             logger.error(f"Request timeout: {request.url.path}")
+            # Real-time error metric
+            metrics_collector.record_error(
+                error_type="timeout",
+                endpoint=request.url.path
+            )
             return JSONResponse(
                 status_code=504,
                 content=ErrorResponse(
@@ -67,6 +100,11 @@ class ErrorHandlingMiddleware(BaseHTTPMiddleware):
             )
         except Exception as e:
             logger.exception(f"Unhandled exception: {str(e)}")
+            # Real-time error metric
+            metrics_collector.record_error(
+                error_type="internal_error",
+                endpoint=request.url.path
+            )
             return JSONResponse(
                 status_code=500,
                 content=ErrorResponse(

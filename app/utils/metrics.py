@@ -3,6 +3,7 @@ import psutil
 import mlx.core as mx
 from typing import Dict, Any
 import time
+import os
 
 from app.core.config import get_settings
 
@@ -131,6 +132,115 @@ api_key_requests_total = Counter(
     ['api_key_prefix', 'model_name', 'status']
 )
 
+# New useful metrics
+
+# Response quality metrics
+response_truncated_total = Counter(
+    'response_truncated_total',
+    'Responses truncated due to max_tokens limit',
+    ['model_name']
+)
+
+# Model switching metrics
+model_switch_duration = Histogram(
+    'model_switch_duration_seconds',
+    'Time taken to switch between models',
+    ['from_model', 'to_model']
+)
+
+# Request size metrics
+request_size_bytes = Histogram(
+    'request_size_bytes',
+    'Size of incoming requests in bytes',
+    ['endpoint'],
+    buckets=[100, 500, 1000, 5000, 10000, 50000, 100000, 500000, float('inf')]
+)
+
+response_size_bytes = Histogram(
+    'response_size_bytes', 
+    'Size of responses in bytes',
+    ['endpoint'],
+    buckets=[100, 500, 1000, 5000, 10000, 50000, 100000, 500000, float('inf')]
+)
+
+# Streaming metrics
+streaming_requests_total = Counter(
+    'streaming_requests_total',
+    'Total streaming requests',
+    ['model_name', 'status']
+)
+
+streaming_chunk_latency = Histogram(
+    'streaming_chunk_latency_seconds',
+    'Time between streaming chunks',
+    ['model_name'],
+    buckets=[0.01, 0.05, 0.1, 0.5, 1.0, 2.0, 5.0, float('inf')]
+)
+
+# Temperature and sampling metrics
+temperature_distribution = Histogram(
+    'temperature_distribution',
+    'Distribution of temperature values used',
+    ['model_name'],
+    buckets=[0, 0.1, 0.3, 0.5, 0.7, 0.9, 1.0, 1.5, 2.0, float('inf')]
+)
+
+top_p_distribution = Histogram(
+    'top_p_distribution',
+    'Distribution of top_p values used',
+    ['model_name'],
+    buckets=[0, 0.1, 0.3, 0.5, 0.7, 0.9, 0.95, 0.99, 1.0]
+)
+
+# Model-specific performance
+model_warmup_time = Gauge(
+    'model_warmup_time_seconds',
+    'Time since model was loaded (warmup indicator)',
+    ['model_name']
+)
+
+# Queue and backpressure metrics
+request_queue_time = Histogram(
+    'request_queue_time_seconds',
+    'Time spent waiting in queue before processing',
+    ['model_name'],
+    buckets=[0, 0.1, 0.5, 1.0, 2.0, 5.0, 10.0, 30.0, 60.0, float('inf')]
+)
+
+rejected_requests_total = Counter(
+    'rejected_requests_total',
+    'Requests rejected due to overload',
+    ['reason']  # rate_limit, memory_pressure, queue_full
+)
+
+# Context window utilization
+context_utilization_ratio = Histogram(
+    'context_utilization_ratio',
+    'Ratio of tokens used vs context window size',
+    ['model_name'],
+    buckets=[0.1, 0.25, 0.5, 0.75, 0.9, 0.95, 0.99, 1.0]
+)
+
+# GPU utilization (Apple Silicon specific)
+metal_memory_usage_bytes = Gauge(
+    'metal_memory_usage_bytes',
+    'Metal GPU memory usage in bytes'
+)
+
+# System health
+disk_usage_bytes = Gauge(
+    'disk_usage_bytes',
+    'Disk usage for model cache directory',
+    ['type']  # total, used, free
+)
+
+# Network I/O
+network_io_bytes = Counter(
+    'network_io_bytes_total',
+    'Network I/O in bytes',
+    ['direction']  # sent, received
+)
+
 
 class MetricsCollector:
     def __init__(self):
@@ -141,16 +251,30 @@ class MetricsCollector:
         self._total_latency = 0.0
         self._active_inferences = 0
         self._queue_depth = 0
+        self._last_memory_update = 0
+        self._memory_update_interval = 1.0  # Update memory metrics every 1 second
+        self._model_load_times = {}  # Track when each model was loaded
+        self._last_active_model = None
+        self._model_switch_start = None
+        self._last_net_io = {'bytes_sent': 0, 'bytes_recv': 0}  # Track network I/O counters
         
-    def update_memory_metrics(self):
-        """Update memory usage metrics"""
+    def update_memory_metrics(self, force=False):
+        """Update memory usage metrics with rate limiting"""
+        current_time = time.time()
+        
+        # Rate limit memory updates unless forced
+        if not force and (current_time - self._last_memory_update) < self._memory_update_interval:
+            return
+        
+        self._last_memory_update = current_time
+        
         memory = psutil.virtual_memory()
         memory_usage_bytes.labels(type='total').set(memory.total)
         memory_usage_bytes.labels(type='used').set(memory.used)
         memory_usage_bytes.labels(type='available').set(memory.available)
         
-        # Update CPU usage
-        cpu_percent = psutil.cpu_percent(interval=None)  # Non-blocking call
+        # Update CPU usage with non-blocking call
+        cpu_percent = psutil.cpu_percent(interval=0)  # Immediate non-blocking
         cpu_usage_percent.set(cpu_percent)
         
         # MLX GPU memory tracking
@@ -174,6 +298,48 @@ class MetricsCollector:
                 gpu_memory_usage_bytes.set(0)
         except Exception:
             gpu_memory_usage_bytes.set(0)
+        
+        # Update disk usage for model cache
+        try:
+            import shutil
+            cache_dir = self.settings.model_cache_dir
+            if cache_dir:
+                # Create cache directory if it doesn't exist
+                os.makedirs(cache_dir, exist_ok=True)
+                disk_usage = shutil.disk_usage(cache_dir)
+                disk_usage_bytes.labels(type='total').set(disk_usage.total)
+                disk_usage_bytes.labels(type='used').set(disk_usage.used)
+                disk_usage_bytes.labels(type='free').set(disk_usage.free)
+        except Exception as e:
+            # Fallback to current directory
+            try:
+                import shutil
+                disk_usage = shutil.disk_usage('.')
+                disk_usage_bytes.labels(type='total').set(disk_usage.total)
+                disk_usage_bytes.labels(type='used').set(disk_usage.used)
+                disk_usage_bytes.labels(type='free').set(disk_usage.free)
+            except Exception:
+                pass
+        
+        # Update network I/O stats (incremental)
+        try:
+            net_io = psutil.net_io_counters()
+            if net_io:
+                # Calculate incremental values since last update
+                sent_delta = net_io.bytes_sent - self._last_net_io['bytes_sent']
+                recv_delta = net_io.bytes_recv - self._last_net_io['bytes_recv']
+                
+                # Only increment if positive (avoid negative values on counter resets)
+                if sent_delta > 0:
+                    network_io_bytes.labels(direction='sent').inc(sent_delta)
+                if recv_delta > 0:
+                    network_io_bytes.labels(direction='received').inc(recv_delta)
+                
+                # Update last known values
+                self._last_net_io['bytes_sent'] = net_io.bytes_sent
+                self._last_net_io['bytes_recv'] = net_io.bytes_recv
+        except Exception:
+            pass
     
     def record_request(self, method: str, endpoint: str, status: int, duration: float):
         """Record request metrics"""
@@ -189,14 +355,19 @@ class MetricsCollector:
         """Record start of inference"""
         self._active_inferences += 1
         concurrent_inferences.set(self._active_inferences)
+        # Update memory metrics on inference start
+        self.update_memory_metrics()
 
     def record_inference_end(self):
         """Record end of inference"""
         self._active_inferences = max(0, self._active_inferences - 1)
         concurrent_inferences.set(self._active_inferences)
+        # Update memory metrics on inference end
+        self.update_memory_metrics()
 
     def record_token_metrics(self, model_name: str, prompt_tokens: int, completion_tokens: int, 
-                           generation_time: float, first_token_time: float = None, api_key_prefix: str = None):
+                           generation_time: float, first_token_time: float = None, api_key_prefix: str = None,
+                           max_tokens: int = None, actual_tokens: int = None, context_window: int = 4096):
         """Record token-related metrics"""
         # Token counts
         tokens_processed_total.labels(model_name=model_name, type='prompt').inc(prompt_tokens)
@@ -219,6 +390,16 @@ class MetricsCollector:
         # Time to first token
         if first_token_time is not None:
             time_to_first_token.labels(model_name=model_name).observe(first_token_time)
+        
+        # Context window utilization
+        total_tokens = prompt_tokens + completion_tokens
+        if context_window > 0:
+            utilization = total_tokens / context_window
+            context_utilization_ratio.labels(model_name=model_name).observe(utilization)
+        
+        # Check if response was truncated
+        if max_tokens and actual_tokens and actual_tokens >= max_tokens:
+            response_truncated_total.labels(model_name=model_name).inc()
 
     def record_api_key_request(self, api_key_prefix: str, model_name: str, status: str):
         """Record API key request"""
@@ -228,9 +409,65 @@ class MetricsCollector:
         """Record error with categorization"""
         errors_total.labels(error_type=error_type, model_name=model_name, endpoint=endpoint).inc()
 
+    def record_model_loaded(self, model_name: str):
+        """Record when a model is loaded"""
+        self._model_load_times[model_name] = time.time()
+        
+        # Track model switch if applicable
+        if self._last_active_model and self._last_active_model != model_name:
+            if self._model_switch_start:
+                switch_duration = time.time() - self._model_switch_start
+                model_switch_duration.labels(
+                    from_model=self._last_active_model,
+                    to_model=model_name
+                ).observe(switch_duration)
+        
+        self._last_active_model = model_name
+        self._model_switch_start = time.time()
+    
+    def record_model_warmup(self, model_name: str):
+        """Update model warmup time"""
+        if model_name in self._model_load_times:
+            warmup_time = time.time() - self._model_load_times[model_name]
+            model_warmup_time.labels(model_name=model_name).set(warmup_time)
+    
+    def record_sampling_params(self, model_name: str, temperature: float, top_p: float):
+        """Record sampling parameters used"""
+        temperature_distribution.labels(model_name=model_name).observe(temperature)
+        top_p_distribution.labels(model_name=model_name).observe(top_p)
+    
+    def record_request_size(self, endpoint: str, request_bytes: int, response_bytes: int):
+        """Record request and response sizes"""
+        request_size_bytes.labels(endpoint=endpoint).observe(request_bytes)
+        response_size_bytes.labels(endpoint=endpoint).observe(response_bytes)
+    
+    def record_streaming_metrics(self, model_name: str, chunk_latency: float = None, status: str = "success"):
+        """Record streaming-related metrics"""
+        streaming_requests_total.labels(model_name=model_name, status=status).inc()
+        if chunk_latency is not None:
+            streaming_chunk_latency.labels(model_name=model_name).observe(chunk_latency)
+    
+    def record_queue_time(self, model_name: str, queue_time: float):
+        """Record time spent in queue"""
+        request_queue_time.labels(model_name=model_name).observe(queue_time)
+    
+    def record_rejected_request(self, reason: str):
+        """Record rejected request"""
+        rejected_requests_total.labels(reason=reason).inc()
+    
     def record_cache_operation(self, operation: str):
         """Record cache operation (hit, miss, eviction, load)"""
         cache_operations_total.labels(operation=operation).inc()
+        
+        # Update cache size metric in real-time
+        if operation in ['load', 'eviction']:
+            from app.services.model_manager import model_manager
+            cache_info = model_manager.get_cache_info()
+            model_cache_size.set(cache_info['cache_size'])
+            
+            # Update model warmup times
+            for model_name in cache_info.get('cached_models', []):
+                self.record_model_warmup(model_name)
     
     def get_metrics_summary(self) -> Dict[str, Any]:
         """Get a summary of metrics"""
@@ -251,7 +488,14 @@ class MetricsCollector:
     
     def get_prometheus_metrics(self) -> str:
         """Get metrics in Prometheus format"""
-        self.update_memory_metrics()
+        # Always update memory metrics when Prometheus scrapes
+        self.update_memory_metrics(force=True)
+        
+        # Update model cache size
+        from app.services.model_manager import model_manager
+        cache_info = model_manager.get_cache_info()
+        model_cache_size.set(cache_info['cache_size'])
+        
         return generate_latest().decode('utf-8')
 
 
