@@ -21,7 +21,7 @@ fi
 BASE_URL="http://localhost:${PORT}"
 API_KEY="mlx_VNMCwTXcikC5O0lCUHj0zRFjxWL7Zr4B1aUYB9nY_XE"
 CONCURRENT=3        # Concurrent requests per batch
-TOTAL=12           # Total requests
+TOTAL=30           # Total requests
 DELAY=2            # 2 seconds between batches
 
 # Colors for output
@@ -252,6 +252,10 @@ show_metrics_summary() {
     local api_key_usage=$(echo "$metrics_data" | grep '^api_key_requests_total' | wc -l)
     local token_usage=$(echo "$metrics_data" | grep '^api_key_token_usage_total' | awk '{sum += $2} END {print sum+0}')
     
+    # Parse API response time metrics
+    local min_response_time=$(echo "$metrics_data" | grep '^api_response_time_min_seconds' | awk '{print $2}' | sort -n | head -1)
+    local max_response_time=$(echo "$metrics_data" | grep '^api_response_time_max_seconds' | awk '{print $2}' | sort -n | tail -1)
+    
     echo -e "${GREEN}=== FINAL METRICS SUMMARY ===${NC}"
     echo -e "✅ API Requests (200): ${api_requests:-0}"
     echo -e "❌ Failed Requests (4xx/5xx): ${failed_requests:-0}"
@@ -259,6 +263,8 @@ show_metrics_summary() {
     echo -e "💾 Memory Used: $(echo "scale=2; ${memory_used:-0} / 1024 / 1024 / 1024" | bc 2>/dev/null || echo "0") GB"
     echo -e "🔑 API Key Metrics Count: ${api_key_usage:-0}"
     echo -e "🎯 Total Tokens Used: ${token_usage:-0}"
+    echo -e "⚡ Min Response Time: ${min_response_time:-N/A}s"
+    echo -e "🐌 Max Response Time: ${max_response_time:-N/A}s"
     
     # Show API key breakdown
     echo ""

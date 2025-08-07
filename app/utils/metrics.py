@@ -226,10 +226,23 @@ model_warmup_time = Gauge(
     ['model_name']
 )
 
-# Queue and backpressure metrics
+# API Response Time Tracking
+api_response_time_min = Gauge(
+    'api_response_time_min_seconds',
+    'Minimum API response time for chat completions',
+    ['model_name']
+)
+
+api_response_time_max = Gauge(
+    'api_response_time_max_seconds', 
+    'Maximum API response time for chat completions',
+    ['model_name']
+)
+
+# Keep the old queue time metric for backwards compatibility but mark as deprecated
 request_queue_time = Histogram(
     'request_queue_time_seconds',
-    'Time spent waiting in queue before processing',
+    'Time spent waiting in queue before processing (deprecated)',
     ['model_name'],
     buckets=[0, 0.1, 0.5, 1.0, 2.0, 5.0, 10.0, 30.0, 60.0, float('inf')]
 )
@@ -252,6 +265,11 @@ context_utilization_ratio = Histogram(
 metal_memory_usage_bytes = Gauge(
     'metal_memory_usage_bytes',
     'Metal GPU memory usage in bytes'
+)
+
+metal_memory_peak_bytes = Gauge(
+    'metal_memory_peak_bytes',
+    'Peak Metal GPU memory usage in bytes'
 )
 
 # System health
@@ -286,6 +304,8 @@ class MetricsCollector:
         self._last_net_io = {'bytes_sent': 0, 'bytes_recv': 0}  # Track network I/O counters
         self._last_disk_update = 0
         self._disk_update_interval = 30.0  # Update disk usage every 30 seconds
+        # Track min/max response times per model
+        self._response_times: Dict[str, Dict[str, float]] = {}  # {model_name: {"min": float, "max": float}}
         
     def update_memory_metrics(self, force=False):
         """Update memory usage metrics with rate limiting"""
@@ -308,23 +328,23 @@ class MetricsCollector:
         
         # MLX GPU memory tracking
         try:
-            if mx and mx.default_device().type.name == "gpu":
-                # MLX doesn't directly expose GPU memory, but we can try system tools
-                try:
-                    # For Apple Silicon, we can use system_profiler or Activity Monitor APIs
-                    # This is a basic implementation - could be enhanced
-                    import subprocess
-                    _ = subprocess.run(['system_profiler', 'SPDisplaysDataType'], 
-                                     capture_output=True, text=True, timeout=2)
-                    # Parse memory info from output if available
-                    # For now, we'll set a placeholder value
-                    gpu_memory_usage_bytes.set(0)  # Will be enhanced later
-                except Exception:
-                    gpu_memory_usage_bytes.set(0)
-            else:
-                gpu_memory_usage_bytes.set(0)
+            if mx:
+                # MLX provides memory info directly
+                # This is much faster than calling system_profiler
+                import mlx.core as mx
+                # Get current and peak memory usage from MLX (using new API)
+                current_memory = mx.get_active_memory()
+                peak_memory = mx.get_peak_memory()
+                
+                # Set both GPU and Metal-specific metrics
+                gpu_memory_usage_bytes.set(current_memory)
+                metal_memory_usage_bytes.set(current_memory)
+                metal_memory_peak_bytes.set(peak_memory)
         except Exception:
+            # If MLX memory tracking fails, set to 0
             gpu_memory_usage_bytes.set(0)
+            metal_memory_usage_bytes.set(0)
+            metal_memory_peak_bytes.set(0)
         
         # Update disk usage for model cache (rate limited)
         if force or (current_time - self._last_disk_update) >= self._disk_update_interval:
@@ -385,15 +405,13 @@ class MetricsCollector:
         """Record start of inference"""
         self._active_inferences += 1
         concurrent_inferences.set(self._active_inferences)
-        # Update memory metrics on inference start
-        self.update_memory_metrics()
+        # Removed update_memory_metrics() call - was causing server hangs
 
     def record_inference_end(self):
         """Record end of inference"""
         self._active_inferences = max(0, self._active_inferences - 1)
         concurrent_inferences.set(self._active_inferences)
-        # Update memory metrics on inference end
-        self.update_memory_metrics()
+        # Removed update_memory_metrics() call - was causing server hangs
 
     def record_token_metrics(self, model_name: str, prompt_tokens: int, completion_tokens: int, 
                            generation_time: float, first_token_time: float = None, api_key_prefix: str = None,
@@ -515,8 +533,20 @@ class MetricsCollector:
             streaming_chunk_latency.labels(model_name=model_name).observe(chunk_latency)
     
     def record_queue_time(self, model_name: str, queue_time: float):
-        """Record time spent in queue"""
+        """Record time spent in queue (deprecated)"""
         request_queue_time.labels(model_name=model_name).observe(queue_time)
+    
+    def record_api_response_time(self, model_name: str, response_time: float):
+        """Record API response time and update min/max metrics"""
+        if model_name not in self._response_times:
+            self._response_times[model_name] = {"min": response_time, "max": response_time}
+        else:
+            self._response_times[model_name]["min"] = min(self._response_times[model_name]["min"], response_time)
+            self._response_times[model_name]["max"] = max(self._response_times[model_name]["max"], response_time)
+        
+        # Update Prometheus metrics
+        api_response_time_min.labels(model_name=model_name).set(self._response_times[model_name]["min"])
+        api_response_time_max.labels(model_name=model_name).set(self._response_times[model_name]["max"])
     
     def record_rejected_request(self, reason: str):
         """Record rejected request"""

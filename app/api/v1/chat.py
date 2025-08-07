@@ -158,6 +158,9 @@ async def chat_completion(
         # Record inference end
         metrics_collector.record_inference_end()
         
+        # Record API response time for min/max tracking
+        metrics_collector.record_api_response_time(request.model, inference_time)
+        
         # Check if response was truncated
         actual_tokens = count_tokens(response_text)
         

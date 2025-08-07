@@ -164,7 +164,7 @@
           "legendFormat": "{{endpoint}}"
         }
       ],
-      "gridPos": {"h": 8, "w": 24, "x": 0, "y": 8},
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8},
       "fieldConfig": {
         "defaults": {
           "unit": "reqps",
@@ -488,31 +488,75 @@
     },
     {
       "id": 21,
-      "title": "Model Switch Duration",
+      "title": "API Response Time Overview",
       "type": "timeseries",
       "targets": [
         {
-          "expr": "histogram_quantile(0.50, rate(model_switch_duration_bucket[5m]))",
-          "legendFormat": "P50"
+          "expr": "api_response_time_min_seconds * 1000",
+          "legendFormat": "Min - {{model_name}}"
         },
         {
-          "expr": "histogram_quantile(0.95, rate(model_switch_duration_bucket[5m]))",
-          "legendFormat": "P95"
+          "expr": "api_response_time_max_seconds * 1000", 
+          "legendFormat": "Max - {{model_name}}"
         },
         {
-          "expr": "histogram_quantile(0.99, rate(model_switch_duration_bucket[5m]))",
-          "legendFormat": "P99"
+          "expr": "min(api_response_time_min_seconds) * 1000",
+          "legendFormat": "Overall Min"
+        },
+        {
+          "expr": "max(api_response_time_max_seconds) * 1000",
+          "legendFormat": "Overall Max"
         }
       ],
       "gridPos": {"h": 8, "w": 12, "x": 0, "y": 40},
       "fieldConfig": {
         "defaults": {
-          "unit": "s",
+          "unit": "ms",
+          "decimals": 1,
           "custom": {
             "drawStyle": "line",
             "lineWidth": 2,
-            "fillOpacity": 10
+            "fillOpacity": 5,
+            "lineInterpolation": "stepAfter"
+          },
+          "color": {"mode": "palette-classic"},
+          "thresholds": {
+            "steps": [
+              {"color": "green", "value": null},
+              {"color": "yellow", "value": 1000},
+              {"color": "red", "value": 5000}
+            ]
           }
+        },
+        "overrides": [
+          {
+            "matcher": {"id": "byName", "options": "Overall Min"},
+            "properties": [
+              {"id": "custom.lineWidth", "value": 3},
+              {"id": "color", "value": {"mode": "fixed", "fixedColor": "green"}}
+            ]
+          },
+          {
+            "matcher": {"id": "byName", "options": "Overall Max"},
+            "properties": [
+              {"id": "custom.lineWidth", "value": 3},
+              {"id": "color", "value": {"mode": "fixed", "fixedColor": "red"}}
+            ]
+          }
+        ]
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true,
+          "calcs": ["min", "max", "mean", "lastNotNull"],
+          "sortBy": "Mean",
+          "sortDesc": false
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "asc"
         }
       }
     },
@@ -596,20 +640,16 @@
     },
     {
       "id": 25,
-      "title": "Queue Wait Time",
+      "title": "Min/Max API Response Time",
       "type": "timeseries",
       "targets": [
         {
-          "expr": "histogram_quantile(0.50, request_queue_time_seconds_bucket) * 1000",
-          "legendFormat": "P50 Queue Time"
+          "expr": "api_response_time_min_seconds * 1000",
+          "legendFormat": "Min Response Time - {{model_name}}"
         },
         {
-          "expr": "histogram_quantile(0.95, request_queue_time_seconds_bucket) * 1000",
-          "legendFormat": "P95 Queue Time"
-        },
-        {
-          "expr": "histogram_quantile(0.99, request_queue_time_seconds_bucket) * 1000",
-          "legendFormat": "P99 Queue Time"
+          "expr": "api_response_time_max_seconds * 1000",
+          "legendFormat": "Max Response Time - {{model_name}}"
         }
       ],
       "gridPos": {"h": 8, "w": 12, "x": 0, "y": 56},
@@ -619,7 +659,16 @@
           "custom": {
             "drawStyle": "line",
             "lineWidth": 2,
-            "fillOpacity": 10
+            "fillOpacity": 10,
+            "lineInterpolation": "stepAfter"
+          },
+          "color": {"mode": "palette-classic"},
+          "thresholds": {
+            "steps": [
+              {"color": "green", "value": null},
+              {"color": "yellow", "value": 1000},
+              {"color": "red", "value": 5000}
+            ]
           }
         }
       }
@@ -823,6 +872,103 @@
           "mode": "multi",
           "sort": "desc"
         }
+      }
+    },
+    {
+      "id": 32,
+      "title": "Current API Performance",
+      "type": "stat",
+      "targets": [
+        {
+          "expr": "min(api_response_time_min_seconds) * 1000",
+          "legendFormat": "Fastest Response"
+        },
+        {
+          "expr": "max(api_response_time_max_seconds) * 1000",
+          "legendFormat": "Slowest Response"
+        },
+        {
+          "expr": "(max(api_response_time_max_seconds) - min(api_response_time_min_seconds)) * 1000",
+          "legendFormat": "Response Range"
+        }
+      ],
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8},
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "decimals": 1,
+          "color": {"mode": "thresholds"},
+          "thresholds": {
+            "steps": [
+              {"color": "green", "value": null},
+              {"color": "yellow", "value": 1000},
+              {"color": "red", "value": 5000}
+            ]
+          },
+          "mappings": [
+            {
+              "options": {
+                "null": {
+                  "text": "No Data"
+                }
+              },
+              "type": "special"
+            }
+          ]
+        },
+        "overrides": [
+          {
+            "matcher": {"id": "byName", "options": "Fastest Response"},
+            "properties": [
+              {"id": "color", "value": {"mode": "fixed", "fixedColor": "green"}},
+              {"id": "thresholds", "value": {
+                "steps": [
+                  {"color": "green", "value": null},
+                  {"color": "yellow", "value": 500},
+                  {"color": "orange", "value": 1000}
+                ]
+              }}
+            ]
+          },
+          {
+            "matcher": {"id": "byName", "options": "Slowest Response"},
+            "properties": [
+              {"id": "color", "value": {"mode": "fixed", "fixedColor": "red"}},
+              {"id": "thresholds", "value": {
+                "steps": [
+                  {"color": "green", "value": null},
+                  {"color": "yellow", "value": 2000},
+                  {"color": "red", "value": 5000}
+                ]
+              }}
+            ]
+          },
+          {
+            "matcher": {"id": "byName", "options": "Response Range"},
+            "properties": [
+              {"id": "color", "value": {"mode": "fixed", "fixedColor": "blue"}},
+              {"id": "thresholds", "value": {
+                "steps": [
+                  {"color": "green", "value": null},
+                  {"color": "yellow", "value": 1000},
+                  {"color": "orange", "value": 3000}
+                ]
+              }}
+            ]
+          }
+        ]
+      },
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": ["lastNotNull"],
+          "fields": ""
+        },
+        "orientation": "horizontal",
+        "textMode": "value_and_name",
+        "colorMode": "background",
+        "graphMode": "area",
+        "justifyMode": "auto"
       }
     }
   ],

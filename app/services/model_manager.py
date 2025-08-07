@@ -81,16 +81,23 @@ class ModelManager:
         self.settings = get_settings()
         self.backend = BACKEND
         self._models_cache: OrderedDict[str, Any] = OrderedDict()
-        self._cache_lock = threading.Lock()
-        self._loading_locks: Dict[str, threading.Lock] = {}
+        self._cache_lock = threading.Lock()  # Use threading lock
         self._last_access: Dict[str, float] = {}
         self._load_times: Dict[str, float] = {}
+        # Global lock for MLX operations to prevent Metal GPU conflicts (lazy init)
+        self._mlx_lock = None
         
         # Backend-specific initialization
         if self.backend == "vllm":
             self._vllm_engines: Dict[str, Any] = {}
         
         logger.info(f"ModelManager initialized with {self.backend} backend")
+        
+    def _get_mlx_lock(self):
+        """Get MLX lock with lazy initialization"""
+        if self.backend == "mlx" and self._mlx_lock is None:
+            self._mlx_lock = asyncio.Lock()
+        return self._mlx_lock
         
     def _get_memory_usage(self) -> Dict[str, float]:
         """Get current memory usage statistics"""
@@ -131,7 +138,7 @@ class ModelManager:
     
     async def get_model(self, model_name: str) -> Tuple[Any, Any]:
         """Get a model from cache or load it"""
-        # Check cache first
+        # Simple cache check - no complex locking
         with self._cache_lock:
             if model_name in self._models_cache:
                 self._last_access[model_name] = time.time()
@@ -145,63 +152,48 @@ class ModelManager:
                 
                 return self._models_cache[model_name]
         
-        # Get or create loading lock for this model
-        if model_name not in self._loading_locks:
-            self._loading_locks[model_name] = threading.Lock()
+        # Simple approach: just load the model (allow concurrent loads for now)
+        logger.info(f"Loading model {model_name}")
+        from app.utils.metrics import metrics_collector
+        metrics_collector.record_cache_operation("miss")
+        metrics_collector.record_cache_operation("load")
         
-        # Load model with lock to prevent duplicate loading
-        with self._loading_locks[model_name]:
-            # Double-check cache after acquiring lock
-            with self._cache_lock:
-                if model_name in self._models_cache:
-                    self._last_access[model_name] = time.time()
-                    from app.utils.metrics import metrics_collector
-                    metrics_collector.record_cache_operation("hit")
-                    return self._models_cache[model_name]
-            
-            # Record cache miss and load
-            from app.utils.metrics import metrics_collector
-            metrics_collector.record_cache_operation("miss")
-            metrics_collector.record_cache_operation("load")
-            
-            # Load model
-            logger.info(f"Loading model {model_name}")
-            start_time = time.time()
-            start_memory = psutil.virtual_memory().used
-            
-            try:
-                # Load model based on backend
+        start_time = time.time()
+        start_memory = psutil.virtual_memory().used
+        
+        # Load model based on backend (with MLX lock if needed)
+        mlx_lock = self._get_mlx_lock()
+        if mlx_lock:
+            async with mlx_lock:
                 model_data = await self._load_model_backend_specific(model_name)
-                
-                load_time = time.time() - start_time
-                self._load_times[model_name] = load_time
-                logger.info(f"Model {model_name} loaded in {load_time:.2f}s using {self.backend} backend")
-                
-                # Check if we need to evict before adding
-                while self._should_evict_model():
-                    self._evict_least_recently_used()
-                
-                # Add to cache
-                with self._cache_lock:
-                    self._models_cache[model_name] = model_data
-                    self._last_access[model_name] = time.time()
-                
-                # Estimate memory usage (rough calculation)
-                memory_after = psutil.virtual_memory().used
-                estimated_model_memory = max(0, memory_after - start_memory)
-                
-                # Record model memory footprint
-                from app.utils.metrics import model_memory_usage_bytes
-                model_memory_usage_bytes.labels(model_name=model_name).set(estimated_model_memory)
-                
-                # Record that model was loaded
-                metrics_collector.record_model_loaded(model_name)
-                
-                return model_data
-                
-            except Exception as e:
-                logger.error(f"Failed to load model {model_name}: {str(e)}")
-                raise
+        else:
+            model_data = await self._load_model_backend_specific(model_name)
+        
+        load_time = time.time() - start_time
+        self._load_times[model_name] = load_time
+        logger.info(f"Model {model_name} loaded in {load_time:.2f}s using {self.backend} backend")
+        
+        # Check if we need to evict before adding
+        while self._should_evict_model():
+            self._evict_least_recently_used()
+        
+        # Add to cache
+        with self._cache_lock:
+            self._models_cache[model_name] = model_data
+            self._last_access[model_name] = time.time()
+        
+        # Estimate memory usage (rough calculation)
+        memory_after = psutil.virtual_memory().used
+        estimated_model_memory = max(0, memory_after - start_memory)
+        
+        # Record model memory footprint
+        from app.utils.metrics import model_memory_usage_bytes
+        model_memory_usage_bytes.labels(model_name=model_name).set(estimated_model_memory)
+        
+        # Record that model was loaded
+        metrics_collector.record_model_loaded(model_name)
+        
+        return model_data
     
     def _clean_response(self, response: str) -> str:
         """Clean and post-process the generated response"""
@@ -291,17 +283,30 @@ class ModelManager:
         model_data = await self.get_model(model_name)
         
         if self.backend == "mlx":
-            # MLX generation
+            # MLX generation with lock to prevent Metal GPU conflicts
             model, tokenizer = model_data
             loop = asyncio.get_event_loop()
-            response = await loop.run_in_executor(
-                None,
-                generate,
-                model,
-                tokenizer,
-                prompt,
-                {"temp": temperature, "max_tokens": max_tokens, "top_p": top_p}
-            )
+            
+            mlx_lock = self._get_mlx_lock()
+            if mlx_lock:
+                async with mlx_lock:
+                    response = await loop.run_in_executor(
+                        None,
+                        generate,
+                        model,
+                        tokenizer,
+                        prompt,
+                        {"temp": temperature, "max_tokens": max_tokens, "top_p": top_p}
+                    )
+            else:
+                response = await loop.run_in_executor(
+                    None,
+                    generate,
+                    model,
+                    tokenizer,
+                    prompt,
+                    {"temp": temperature, "max_tokens": max_tokens, "top_p": top_p}
+                )
         
         elif self.backend == "vllm":
             # vLLM generation
