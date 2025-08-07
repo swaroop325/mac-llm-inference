@@ -76,8 +76,8 @@ async def start_metrics_collection():
             from app.utils.metrics import model_cache_size
             model_cache_size.set(cache_info["cache_size"])
             
-            # Wait only 2 seconds for more real-time updates
-            await asyncio.sleep(2)
+            # Wait 5 seconds to reduce overhead
+            await asyncio.sleep(5)
         except asyncio.CancelledError:
             break
         except Exception as e:

@@ -252,11 +252,13 @@ class MetricsCollector:
         self._active_inferences = 0
         self._queue_depth = 0
         self._last_memory_update = 0
-        self._memory_update_interval = 1.0  # Update memory metrics every 1 second
+        self._memory_update_interval = 5.0  # Update memory metrics every 5 seconds (reduced frequency)
         self._model_load_times = {}  # Track when each model was loaded
         self._last_active_model = None
         self._model_switch_start = None
         self._last_net_io = {'bytes_sent': 0, 'bytes_recv': 0}  # Track network I/O counters
+        self._last_disk_update = 0
+        self._disk_update_interval = 30.0  # Update disk usage every 30 seconds
         
     def update_memory_metrics(self, force=False):
         """Update memory usage metrics with rate limiting"""
@@ -299,27 +301,30 @@ class MetricsCollector:
         except Exception:
             gpu_memory_usage_bytes.set(0)
         
-        # Update disk usage for model cache
-        try:
-            import shutil
-            cache_dir = self.settings.model_cache_dir
-            if cache_dir:
-                # Create cache directory if it doesn't exist
-                os.makedirs(cache_dir, exist_ok=True)
-                disk_usage = shutil.disk_usage(cache_dir)
-                disk_usage_bytes.labels(type='total').set(disk_usage.total)
-                disk_usage_bytes.labels(type='used').set(disk_usage.used)
-                disk_usage_bytes.labels(type='free').set(disk_usage.free)
-        except Exception as e:
-            # Fallback to current directory
+        # Update disk usage for model cache (rate limited)
+        if force or (current_time - self._last_disk_update) >= self._disk_update_interval:
             try:
                 import shutil
-                disk_usage = shutil.disk_usage('.')
-                disk_usage_bytes.labels(type='total').set(disk_usage.total)
-                disk_usage_bytes.labels(type='used').set(disk_usage.used)
-                disk_usage_bytes.labels(type='free').set(disk_usage.free)
-            except Exception:
-                pass
+                cache_dir = self.settings.model_cache_dir
+                if cache_dir:
+                    # Create cache directory if it doesn't exist
+                    os.makedirs(cache_dir, exist_ok=True)
+                    disk_usage = shutil.disk_usage(cache_dir)
+                    disk_usage_bytes.labels(type='total').set(disk_usage.total)
+                    disk_usage_bytes.labels(type='used').set(disk_usage.used)
+                    disk_usage_bytes.labels(type='free').set(disk_usage.free)
+                    self._last_disk_update = current_time
+            except Exception as e:
+                # Fallback to current directory
+                try:
+                    import shutil
+                    disk_usage = shutil.disk_usage('.')
+                    disk_usage_bytes.labels(type='total').set(disk_usage.total)
+                    disk_usage_bytes.labels(type='used').set(disk_usage.used)
+                    disk_usage_bytes.labels(type='free').set(disk_usage.free)
+                    self._last_disk_update = current_time
+                except Exception:
+                    pass
         
         # Update network I/O stats (incremental)
         try:

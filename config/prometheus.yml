@@ -1,6 +1,6 @@
 global:
-  scrape_interval: 5s     # Reduced from 15s for more real-time metrics
-  evaluation_interval: 5s  # Match scrape interval for consistency
+  scrape_interval: 10s     # Balanced for performance and real-time updates
+  evaluation_interval: 10s  # Match scrape interval for consistency
   external_labels:
     monitor: 'mlx-inference-server'
 
@@ -13,8 +13,8 @@ scrape_configs:
     static_configs:
       - targets: ['localhost:8000']
     metrics_path: '/metrics/prometheus'
-    scrape_interval: 5s  # Reduced from 15s for more real-time updates
-    scrape_timeout: 3s   # Adjusted timeout accordingly
+    scrape_interval: 10s  # Balanced for performance and real-time updates
+    scrape_timeout: 5s    # Adjusted timeout accordingly
     
   - job_name: 'prometheus'
     static_configs:
