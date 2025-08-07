@@ -721,151 +721,109 @@
     },
     {
       "id": 41,
-      "title": "API Key Usage Summary",
-      "type": "barchart",
+      "title": "API Key Usage Over Time",
+      "type": "timeseries",
       "targets": [
         {
-          "expr": "sum by (api_key_name) (api_key_requests_total)",
-          "legendFormat": "{{api_key_name}}",
-          "refId": "A"
-        }
-      ],
-      "gridPos": {"h": 6, "w": 12, "x": 0, "y": 72},
-      "fieldConfig": {
-        "defaults": {
-          "unit": "short",
-          "custom": {
-            "axisPlacement": "auto",
-            "barAlignment": 0,
-            "drawStyle": "line",
-            "fillOpacity": 80,
-            "gradientMode": "none",
-            "hideFrom": {
-              "legend": false,
-              "tooltip": false,
-              "vis": false
-            },
-            "lineWidth": 1,
-            "stacking": {
-              "group": "A",
-              "mode": "none"
-            },
-            "thresholdsStyle": {
-              "mode": "off"
-            }
-          },
-          "color": {
-            "mode": "palette-classic"
-          },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              }
-            ]
-          }
-        }
-      },
-      "options": {
-        "displayMode": "list",
-        "orientation": "horizontal",
-        "reduceOptions": {
-          "values": false,
-          "calcs": ["lastNotNull"],
-          "fields": ""
+          "expr": "sum by (api_key_name) (rate(api_key_requests_total[5m]))",
+          "legendFormat": "{{api_key_name}} Requests/sec"
         },
-        "showUnfilled": true,
-        "legend": {
-          "displayMode": "visible",
-          "placement": "bottom"
-        }
-      }
-    },
-    {
-      "id": 42,
-      "title": "API Key Usage by Purpose/Endpoint",
-      "type": "table",
-      "targets": [
         {
-          "expr": "sum by (api_key_name, endpoint, method) (api_key_usage_by_endpoint_total)",
-          "format": "table",
-          "instant": true,
-          "refId": "A"
+          "expr": "sum by (api_key_name) (rate(api_key_token_usage_total[5m]))",
+          "legendFormat": "{{api_key_name}} Tokens/sec"
         }
       ],
-      "gridPos": {"h": 4, "w": 24, "x": 0, "y": 76},
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 72},
       "fieldConfig": {
         "defaults": {
-          "unit": "short",
+          "decimals": 2,
           "custom": {
-            "align": "auto",
-            "cellOptions": {
-              "type": "auto"
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
             },
-            "inspect": false
-          }
+            "axisPlacement": "auto",
+            "axisLabel": "",
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": true
+          },
+          "unit": "short"
         },
         "overrides": [
           {
-            "matcher": {"id": "byName", "options": "api_key_name"},
+            "matcher": {"id": "byRegexp", "options": ".*Tokens.*"},
             "properties": [
-              {"id": "displayName", "value": "API Key Name"},
-              {"id": "custom.width", "value": 250}
-            ]
-          },
-          {
-            "matcher": {"id": "byName", "options": "endpoint"},
-            "properties": [
-              {"id": "displayName", "value": "Endpoint"},
-              {"id": "custom.width", "value": 200}
-            ]
-          },
-          {
-            "matcher": {"id": "byName", "options": "method"},
-            "properties": [
-              {"id": "displayName", "value": "Method"},
-              {"id": "custom.width", "value": 100}
-            ]
-          },
-          {
-            "matcher": {"id": "byName", "options": "Value"},
-            "properties": [
-              {"id": "displayName", "value": "Usage Count"},
-              {"id": "custom.width", "value": 120}
+              {"id": "unit", "value": "short"},
+              {"id": "custom.axisPlacement", "value": "right"}
             ]
           }
         ]
       },
       "options": {
-        "frameIndex": 0,
-        "showHeader": true,
-        "cellHeight": "sm"
-      },
-      "transformations": [
-        {
-          "id": "organize",
-          "options": {
-            "excludeByName": {
-              "Time": true,
-              "__name__": true
-            },
-            "indexByName": {
-              "api_key_name": 0,
-              "endpoint": 1,
-              "method": 2,
-              "Value": 3
-            },
-            "renameByName": {
-              "api_key_name": "API Key Name",
-              "endpoint": "Endpoint",
-              "method": "Method",
-              "Value": "Usage Count"
-            }
-          }
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true,
+          "calcs": []
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
         }
-      ]
+      }
+    },
+    {
+      "id": 42,
+      "title": "API Key Endpoint Activity",
+      "type": "timeseries",
+      "targets": [
+        {
+          "expr": "sum by (api_key_name, endpoint) (rate(api_key_usage_by_endpoint_total[5m]))",
+          "legendFormat": "{{api_key_name}} - {{endpoint}}"
+        }
+      ],
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 72},
+      "fieldConfig": {
+        "defaults": {
+          "decimals": 3,
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            },
+            "axisPlacement": "auto",
+            "axisLabel": "",
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": true
+          },
+          "unit": "reqps"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true,
+          "calcs": ["mean", "last"]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
     }
   ],
   "templating": {
