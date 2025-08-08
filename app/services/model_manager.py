@@ -267,7 +267,9 @@ class ModelManager:
                 device=device,
                 max_model_len=getattr(self.settings, 'max_model_len', 2048),
                 gpu_memory_utilization=getattr(self.settings, 'gpu_memory_fraction', 0.8) if device == "cuda" else 0.0,
-                disable_log_stats=True
+                disable_log_stats=True,
+                use_async_output_proc=False,  # Disable async output processing for compatibility
+                enforce_eager=True  # Use eager mode for better compatibility
             )
             
             engine = AsyncLLMEngine.from_engine_args(engine_args)

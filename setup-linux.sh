@@ -108,8 +108,9 @@ for arg in "$@"; do
 done
 
 print_info "Starting LLM Inference Server setup (Mode: $MODE)"
-
-# Step 1: Check Python version
+    
+sudo apt update || true
+sudo apt install -y python3.12-venv || true
 PYTHON_VERSION=$(python3 --version 2>&1 | awk '{print $2}')
 REQUIRED_VERSION="3.8"
 if ! python3 -c "import sys; exit(0 if sys.version_info >= (3, 8) else 1)"; then
@@ -315,8 +316,6 @@ if [ "$ENABLE_GRAFANA" = "yes" ]; then
     
     # Stop any existing Grafana service
     sudo systemctl stop grafana-server 2>/dev/null || true
-    sudo apt update || true
-    sudo apt install -y python3.12-venv || true
     sudo apt install -y nvidia-driver-550-server nvidia-utils-550-server || true
 
     pkill grafana-server 2>/dev/null || true
