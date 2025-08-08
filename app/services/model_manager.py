@@ -243,13 +243,17 @@ class ModelManager:
             return await loop.run_in_executor(None, load_mlx_model)
         
         elif self.backend == "vllm":
-            # vLLM loading
+            # vLLM loading - detect device type for Linux compatibility
+            import torch
+            device = "cuda" if torch.cuda.is_available() else "cpu"
+            
             engine_args = AsyncEngineArgs(
                 model=model_name,
                 tensor_parallel_size=1,
                 dtype="auto",
+                device=device,
                 max_model_len=getattr(self.settings, 'max_model_len', 2048),
-                gpu_memory_utilization=getattr(self.settings, 'gpu_memory_fraction', 0.8),
+                gpu_memory_utilization=getattr(self.settings, 'gpu_memory_fraction', 0.8) if device == "cuda" else 0.0,
                 disable_log_stats=True
             )
             
