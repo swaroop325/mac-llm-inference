@@ -19,7 +19,7 @@ else
 fi
 
 BASE_URL="http://localhost:${PORT}"
-API_KEY="llm_VNMCwTXcikC5O0lCUHj0zRFjxWL7Zr4B1aUYB9nY_XE"
+API_KEY="llm_XQSpsKs_ctT1dPzHYa5bCHPLpC9okrB40FbCuoWfpR8"
 CONCURRENT=3        # Concurrent requests per batch
 TOTAL=30           # Total requests
 DELAY=2            # 2 seconds between batches
