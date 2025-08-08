@@ -305,6 +305,12 @@ trap cleanup SIGINT SIGTERM
 
 if [ "$ENABLE_PROMETHEUS" = "yes" ]; then
     print_info "Starting Prometheus on port 9090..."
+    
+    # Stop any existing system Prometheus service
+    sudo systemctl stop prometheus 2>/dev/null || true
+    pkill prometheus 2>/dev/null || true
+    sleep 1
+    
     prometheus --config.file=config/prometheus.yml --web.listen-address=:9090 --storage.tsdb.path=./data/prometheus > logs/prometheus.log 2>&1 &
     PROMETHEUS_PID=$!
     print_info "Prometheus started with PID $PROMETHEUS_PID ✓"
