@@ -268,13 +268,22 @@ class ModelManager:
                 max_model_len=getattr(self.settings, 'max_model_len', 2048),
                 gpu_memory_utilization=getattr(self.settings, 'gpu_memory_fraction', 0.8) if device == "cuda" else 0.0,
                 disable_log_stats=True,
-                use_async_output_proc=False,  # Disable async output processing for compatibility
                 enforce_eager=True  # Use eager mode for better compatibility
             )
             
-            engine = AsyncLLMEngine.from_engine_args(engine_args)
-            self._vllm_engines[model_name] = engine
-            return engine
+            try:
+                engine = AsyncLLMEngine.from_engine_args(engine_args)
+                self._vllm_engines[model_name] = engine
+                return engine
+            except NotImplementedError as e:
+                if "is_async_output_supported" in str(e):
+                    logger.warning(f"vLLM async output not supported on this platform: {e}")
+                    logger.info("Falling back to CPU backend")
+                    # Fallback to CPU backend
+                    self.backend = "cpu"
+                    return await self._load_model_backend_specific(model_name)
+                else:
+                    raise
         
         elif self.backend == "cpu":
             # CPU loading with Transformers
