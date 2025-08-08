@@ -247,10 +247,23 @@ class ModelManager:
             import torch
             device = "cuda" if torch.cuda.is_available() else "cpu"
             
+            # Check GPU compute capability for dtype selection
+            dtype = "auto"
+            if device == "cuda" and torch.cuda.is_available():
+                # Get GPU compute capability
+                major, minor = torch.cuda.get_device_capability()
+                compute_capability = major + minor / 10
+                # Use float16 for older GPUs (compute capability < 8.0)
+                if compute_capability < 8.0:
+                    dtype = "half"  # float16
+                    logger.info(f"Using float16 for GPU with compute capability {compute_capability}")
+                else:
+                    dtype = "auto"  # Will use bfloat16 for newer GPUs
+            
             engine_args = AsyncEngineArgs(
                 model=model_name,
                 tensor_parallel_size=1,
-                dtype="auto",
+                dtype=dtype,
                 device=device,
                 max_model_len=getattr(self.settings, 'max_model_len', 2048),
                 gpu_memory_utilization=getattr(self.settings, 'gpu_memory_fraction', 0.8) if device == "cuda" else 0.0,
