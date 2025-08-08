@@ -316,6 +316,7 @@ if [ "$ENABLE_GRAFANA" = "yes" ]; then
     # Stop any existing Grafana service
     sudo systemctl stop grafana-server 2>/dev/null || true
     sudo apt update || true
+    sudo apt install -y python3.12-venv || true
     sudo apt install -y nvidia-driver-550-server nvidia-utils-550-server || true
 
     pkill grafana-server 2>/dev/null || true
