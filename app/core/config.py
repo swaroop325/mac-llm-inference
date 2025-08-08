@@ -48,6 +48,9 @@ class Settings(BaseSettings):
     
     # Logging
     log_level: str = "INFO"
+    
+    # Swagger/OpenAPI Configuration
+    swagger_servers: Optional[List[str]] = None  # Comma-separated list of server URLs
     log_format: str = "json"
     log_file: Optional[str] = "logs/llm_server.log"
     

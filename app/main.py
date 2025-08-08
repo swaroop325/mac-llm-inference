@@ -144,6 +144,48 @@ def custom_openapi():
         routes=app.routes,
     )
     
+    # Add servers configuration for base URL switching
+    servers = []
+    
+    # Add configured servers from environment/settings
+    if settings.swagger_servers:
+        for server_url in settings.swagger_servers:
+            if server_url.strip():
+                servers.append({
+                    "url": server_url.strip(),
+                    "description": f"Server: {server_url.strip()}"
+                })
+    
+    # Add default servers
+    default_servers = [
+        {
+            "url": f"http://localhost:{settings.port}",
+            "description": "Current local server"
+        },
+        {
+            "url": "{protocol}://{host}:{port}",
+            "description": "Custom server (configurable)",
+            "variables": {
+                "protocol": {
+                    "default": "http",
+                    "enum": ["http", "https"],
+                    "description": "Protocol"
+                },
+                "host": {
+                    "default": "localhost",
+                    "description": "Server hostname or IP"
+                },
+                "port": {
+                    "default": str(settings.port),
+                    "description": "Server port"
+                }
+            }
+        }
+    ]
+    
+    # Combine configured and default servers
+    openapi_schema["servers"] = servers + default_servers if servers else default_servers
+    
     # Add security scheme for Bearer token
     openapi_schema["components"]["securitySchemes"] = {
         "BearerAuth": {
