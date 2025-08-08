@@ -268,7 +268,8 @@ class ModelManager:
                 max_model_len=getattr(self.settings, 'max_model_len', 2048),
                 gpu_memory_utilization=getattr(self.settings, 'gpu_memory_fraction', 0.8) if device == "cuda" else 0.0,
                 disable_log_stats=True,
-                enforce_eager=True  # Use eager mode for better compatibility
+                enforce_eager=True,  # Use eager mode for better compatibility
+                disable_async_output_proc=True  # Disable async output processing for Linux compatibility
             )
             
             try:
