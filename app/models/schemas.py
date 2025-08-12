@@ -35,9 +35,9 @@ class ChatCompletionRequest(BaseModel):
         description="Controls randomness: 0 is deterministic, 2 is very random"
     )
     max_tokens: Optional[int] = Field(
-        default=256, 
+        default=2048, 
         ge=1, 
-        le=4096,
+        le=100000,
         description="Maximum number of tokens to generate"
     )
     top_p: Optional[float] = Field(

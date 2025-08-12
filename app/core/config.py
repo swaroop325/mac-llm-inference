@@ -26,8 +26,8 @@ class Settings(BaseSettings):
     
     # Inference Configuration
     default_temperature: float = 0.7
-    default_max_tokens: int = 256
-    max_allowed_tokens: int = 4096
+    default_max_tokens: int = 2048
+    max_allowed_tokens: int = 100000
     timeout_seconds: int = 300
     model_load_timeout_seconds: int = 600  # 10 minutes for model loading
     
