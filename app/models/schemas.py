@@ -35,10 +35,10 @@ class ChatCompletionRequest(BaseModel):
         description="Controls randomness: 0 is deterministic, 2 is very random"
     )
     max_tokens: Optional[int] = Field(
-        default=2048, 
+        default=None, 
         ge=1, 
-        le=100000,
-        description="Maximum number of tokens to generate"
+        le=132768,
+        description="Maximum number of tokens to generate. If not provided, uses server default (8192)."
     )
     top_p: Optional[float] = Field(
         default=1.0, 
@@ -75,6 +75,8 @@ class ChatCompletionRequest(BaseModel):
     
     @validator("max_tokens")
     def validate_max_tokens(cls, v, values):
+        if v is None:
+            return v  # Allow None values (will use default)
         from app.core.config import get_settings
         settings = get_settings()
         if v > settings.max_allowed_tokens:

@@ -10,11 +10,11 @@ set -e
 # Read configuration from .env file if available
 if [[ -f .env ]]; then
     PORT=$(grep "^PORT=" .env | cut -d'=' -f2)
-    PORT=${PORT:-8000}  # Default to 8000 if not found
+    PORT=${PORT:-7000}  # Default to 7000 if not found
     BACKEND=$(grep "^INFERENCE_BACKEND=" .env | cut -d'=' -f2)
     BACKEND=${BACKEND:-auto}  # Default to auto if not found
 else
-    PORT=8000
+    PORT=7000
     BACKEND=auto
 fi
 
@@ -213,7 +213,7 @@ check_system_status() {
     
     # Check if server process is running
     if pgrep -f uvicorn >/dev/null; then
-        echo -e "${GREEN}✓ Server process is running on port 8000${NC}"
+        echo -e "${GREEN}✓ Server process is running on port 7000${NC}"
         
         # Try a simple connectivity test with timeout
         echo -e "${BLUE}Testing server connectivity...${NC}"
@@ -224,7 +224,7 @@ check_system_status() {
         fi
     else
         echo -e "${RED}❌ Error: No uvicorn process found${NC}"
-        echo -e "${YELLOW}Start the server with: uvicorn app.main:app --host 0.0.0.0 --port 8000${NC}"
+        echo -e "${YELLOW}Start the server with: uvicorn app.main:app --host 0.0.0.0 --port 7000${NC}"
         exit 1
     fi
 }

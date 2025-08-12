@@ -265,11 +265,14 @@ class ModelManager:
                 tensor_parallel_size=1,
                 dtype=dtype,
                 device=device,
-                max_model_len=getattr(self.settings, 'max_model_len', 2048),
-                gpu_memory_utilization=getattr(self.settings, 'gpu_memory_fraction', 0.8) if device == "cuda" else 0.0,
+                max_model_len=getattr(self.settings, 'max_model_len', 8192),
+                gpu_memory_utilization=getattr(self.settings, 'gpu_memory_fraction', 0.9) if device == "cuda" else 0.0,
                 disable_log_stats=True,
-                enforce_eager=True,  # Use eager mode for better compatibility
-                disable_async_output_proc=True  # Disable async output processing for Linux compatibility
+                enforce_eager=False,  # Enable CUDA graph optimizations for better performance
+                disable_async_output_proc=False,  # Enable async output processing for faster streaming
+                enable_prefix_caching=True,  # Enable prefix caching for faster inference
+                max_num_batched_tokens=16384,  # Increase batch token limit
+                max_num_seqs=128  # Allow more concurrent sequences
             )
             
             try:
@@ -303,8 +306,8 @@ class ModelManager:
         self, 
         model_name: str, 
         prompt: str,
-        temperature: float = 0.7,
-        max_tokens: int = 256,
+        temperature: float = 0,
+        max_tokens: int = 8192,
         top_p: float = 1.0,
         **kwargs
     ) -> str:
@@ -316,26 +319,30 @@ class ModelManager:
             model, tokenizer = model_data
             loop = asyncio.get_event_loop()
             
+            # Create a wrapper function to pass kwargs properly
+            # Log what we're passing to MLX
+            logger.info(f"Calling MLX generate with max_tokens={max_tokens}")
+            
+            def mlx_generate_wrapper():
+                # MLX generate requires max_tokens as keyword argument
+                # Limit max_tokens for better performance
+                effective_max_tokens = min(max_tokens, 4096)  # Cap at 4096 for MLX
+                result = generate(
+                    model,
+                    tokenizer,
+                    prompt=prompt,
+                    max_tokens=effective_max_tokens,
+                    verbose=True,
+                )
+                logger.info(f"MLX generated {len(result.split())} words with max_tokens={effective_max_tokens}")
+                return result
+            
             mlx_lock = self._get_mlx_lock()
             if mlx_lock:
                 async with mlx_lock:
-                    response = await loop.run_in_executor(
-                        None,
-                        generate,
-                        model,
-                        tokenizer,
-                        prompt,
-                        {"temp": temperature, "max_tokens": max_tokens, "top_p": top_p}
-                    )
+                    response = await loop.run_in_executor(None, mlx_generate_wrapper)
             else:
-                response = await loop.run_in_executor(
-                    None,
-                    generate,
-                    model,
-                    tokenizer,
-                    prompt,
-                    {"temp": temperature, "max_tokens": max_tokens, "top_p": top_p}
-                )
+                response = await loop.run_in_executor(None, mlx_generate_wrapper)
         
         elif self.backend == "vllm":
             # vLLM generation
@@ -344,7 +351,9 @@ class ModelManager:
                 temperature=temperature,
                 max_tokens=max_tokens,
                 top_p=top_p,
-                stop=["User:", "Human:"]
+                stop=["User:", "Human:"],
+                skip_special_tokens=True,
+                spaces_between_special_tokens=False
             )
             
             request_id = random_uuid()

@@ -92,7 +92,7 @@ for arg in "$@"; do
             echo "  --help, -h             Show this help message"
             echo ""
             echo "Environment variables:"
-            echo "  PORT                   Server port (default: 8000)"
+            echo "  PORT                   Server port (default: 7000)"
             echo "  HOST                   Server host (default: 0.0.0.0)"
             echo "  LOG_LEVEL             Log level (default: INFO)"
             echo ""
@@ -169,7 +169,7 @@ else
 fi
 
 # Step 9: Check port availability
-PORT=${PORT:-8000}
+PORT=${PORT:-7000}
 if lsof -Pi :$PORT -sTCP:LISTEN -t >/dev/null 2>&1; then
     print_error "Port $PORT is already in use!"
     print_info "Options:"
@@ -458,7 +458,7 @@ if [ "$MODE" = "production" ]; then
     # Production mode
     uvicorn app.main:app \
         --host "${HOST:-0.0.0.0}" \
-        --port "${PORT:-8000}" \
+        --port "${PORT:-7000}" \
         --workers "${WORKERS:-1}" \
         --loop asyncio \
         --log-level "${LOG_LEVEL:-info}" \
@@ -472,7 +472,7 @@ else
     # Development mode
     uvicorn app.main:app \
         --host "${HOST:-0.0.0.0}" \
-        --port "${PORT:-8000}" \
+        --port "${PORT:-7000}" \
         --reload \
         --log-level "${LOG_LEVEL:-info}" \
         --access-log \

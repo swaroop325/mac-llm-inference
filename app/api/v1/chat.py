@@ -113,7 +113,9 @@ async def chat_completion(
             "request_id": request_id,
             "model": request.model,
             "message_count": len(request.messages),
-            "max_tokens": request.max_tokens,
+            "max_tokens_raw": request.max_tokens,
+            "max_tokens_effective": request.max_tokens or settings.default_max_tokens,
+            "default_max_tokens": settings.default_max_tokens,
             "temperature": request.temperature
         }
     )
@@ -141,12 +143,15 @@ async def chat_completion(
         start_time = time.time()
         first_token_start = time.time()
         
+        # Use default max_tokens from settings if not provided
+        max_tokens = request.max_tokens or settings.default_max_tokens
+        
         response_text = await asyncio.wait_for(
             model_manager.generate_response(
                 model_name=request.model,
                 prompt=prompt,
                 temperature=request.temperature,
-                max_tokens=request.max_tokens,
+                max_tokens=max_tokens,
                 top_p=request.top_p
             ),
             timeout=settings.timeout_seconds
@@ -174,7 +179,7 @@ async def chat_completion(
             first_token_time=first_token_time,
             api_key_prefix=api_key_prefix,
             api_key_name=api_key_name,
-            max_tokens=request.max_tokens,
+            max_tokens=max_tokens,
             actual_tokens=actual_tokens,
             context_window=4096  # Default context window, could be model-specific
         )
@@ -193,7 +198,7 @@ async def chat_completion(
             "choices": [{
                 "index": 0,
                 "message": {"role": "assistant", "content": response_text},
-                "finish_reason": "stop" if len(response_text) < request.max_tokens else "length"
+                "finish_reason": "stop" if len(response_text) < max_tokens else "length"
             }],
             "usage": {
                 "prompt_tokens": prompt_tokens,
@@ -217,7 +222,7 @@ async def chat_completion(
                 ChatCompletionResponseChoice(
                     index=0,
                     message=Message(role="assistant", content=response_text),
-                    finish_reason="stop" if len(response_text) < request.max_tokens else "length"
+                    finish_reason="stop" if len(response_text) < max_tokens else "length"
                 )
             ],
             usage=Usage(

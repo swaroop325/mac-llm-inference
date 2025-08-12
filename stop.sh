@@ -20,7 +20,7 @@ if [ -f .env ]; then
 fi
 
 # Set default ports if not in environment
-PORT=${PORT:-8000}
+PORT=${PORT:-7000}
 APP_PORT=${APP_PORT:-${PORT}}
 PROMETHEUS_PORT=${PROMETHEUS_PORT:-9090}
 GRAFANA_PORT=${GRAFANA_PORT:-3000}

@@ -30,17 +30,17 @@ cp config/.env.example .env
 
 3. **Access Services**
 ```bash
-# Activate API Server:     http://localhost:8000
+# Activate API Server:     http://localhost:7000
 # Prometheus:         http://localhost:9090
 # Grafana Dashboard:  http://localhost:3000 (admin/admin)  
-# API Documentation:  http://localhost:8000/docs
+# API Documentation:  http://localhost:7000/docs
 ```
 
 ## API Usage
 
 ### Chat Completion
 ```bash
-curl -X POST http://localhost:8000/v1/chat/completions \
+curl -X POST http://localhost:7000/v1/chat/completions \
   -H "Content-Type: application/json" \
   -H "X-API-Key: your-api-key" \
   -d '{
@@ -55,16 +55,16 @@ curl -X POST http://localhost:8000/v1/chat/completions \
 
 ### Health Check
 ```bash
-curl http://localhost:8000/health
+curl http://localhost:7000/health
 ```
 
 ### Metrics
 ```bash
 # JSON format
-curl http://localhost:8000/metrics
+curl http://localhost:7000/metrics
 
 # Prometheus format
-curl http://localhost:8000/metrics/prometheus
+curl http://localhost:7000/metrics/prometheus
 ```
 
 ## Configuration
@@ -145,7 +145,7 @@ The server provides comprehensive telemetry:
 **Access Metrics:**
 - Grafana Dashboard: `http://localhost:3000` (admin/admin)
 - Prometheus: `http://localhost:9090`
-- JSON API: `http://localhost:8000/metrics`
+- JSON API: `http://localhost:7000/metrics`
 
 ## Requirements
 

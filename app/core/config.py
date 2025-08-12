@@ -16,18 +16,18 @@ class Settings(BaseSettings):
     
     # Server Configuration
     host: str = "0.0.0.0"
-    port: int = 8000
+    port: int = 7000
     workers: int = 1  # Activate requires single worker for GPU access
     
     # Model Configuration
-    model_path: str = "mlx-community/Llama-3.2-1B-Instruct"
+    model_path: str = "mlx-community/Llama-3.2-1B-Instruct-bf16"
     model_cache_dir: Optional[str] = os.path.expanduser("~/.cache/llm-models")
     max_model_cache_size: int = 5  # Maximum number of models to keep in memory
     
     # Inference Configuration
     default_temperature: float = 0.7
-    default_max_tokens: int = 2048
-    max_allowed_tokens: int = 100000
+    default_max_tokens: int = 5000
+    max_allowed_tokens: int = 10000
     timeout_seconds: int = 300
     model_load_timeout_seconds: int = 600  # 10 minutes for model loading
     
