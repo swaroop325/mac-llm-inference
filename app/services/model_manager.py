@@ -324,15 +324,35 @@ class ModelManager:
             logger.info(f"Calling MLX generate with max_tokens={max_tokens}")
             
             def mlx_generate_wrapper():
+                from mlx_lm.sample_utils import make_sampler
+                
                 # MLX generate requires max_tokens as keyword argument
                 # Limit max_tokens for better performance
                 effective_max_tokens = min(max_tokens, 4096)  # Cap at 4096 for MLX
+                
+                # Create proper sampler with temperature and top_p
+                sampler = make_sampler(
+                    temp=temperature if temperature > 0 else 0.1,  # Avoid 0 temp
+                    top_p=top_p if top_p < 1.0 else 0.95,
+                    min_p=0.05,  # Filter very low probability tokens
+                    min_tokens_to_keep=1
+                )
+                
+                # Add repetition penalty
+                from mlx_lm.sample_utils import make_repetition_penalty
+                repetition_penalty = make_repetition_penalty(penalty=1.1, context_size=20)
+                
                 result = generate(
                     model,
                     tokenizer,
                     prompt=prompt,
                     max_tokens=effective_max_tokens,
-                    verbose=True,
+                    verbose=False,  # Set to False for production
+                    sampler=sampler,
+                    logits_processors=[repetition_penalty],
+                    # KV cache optimization for better performance
+                    max_kv_size=2048,  # Limit KV cache size
+                    prefill_step_size=512  # Smaller prefill steps for better memory usage
                 )
                 logger.info(f"MLX generated {len(result.split())} words with max_tokens={effective_max_tokens}")
                 return result
